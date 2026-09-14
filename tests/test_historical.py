@@ -1,12 +1,17 @@
 """Regression tests for historical cutoffs, target construction, and draw scoring."""
 
 import unittest
+from pathlib import Path
+from unittest.mock import patch
+import json
 
 import numpy as np
 import pandas as pd
 
 from off_the_tape.historical import evaluate, historical_cases
+from off_the_tape.cli import main, samples_from_frame
 from off_the_tape.scoring import raw_track2_score
+from qfbench2_track_forecasting.scoring import _composite
 
 
 def panel(values):
@@ -71,6 +76,54 @@ class ScoringTest(unittest.TestCase):
             raw_track2_score(draws[:199], np.array([3.0]))
         with self.assertRaisesRegex(ValueError, "shape"):
             raw_track2_score(draws, np.array([3.0, 4.0]))
+
+    def test_raw_score_matches_canonical_composite(self):
+        draws = np.column_stack((np.linspace(1, 3, 200), np.linspace(4, 8, 200)))
+        realized = np.array([2.5, 5.0])
+        expected = _composite(
+            draws, realized, weights=(0.5, 0.3, 0.2),
+            tail_levels=(0.01, 0.05, 0.95, 0.99), joint="variogram",
+            tail_metric="pinball", ref_scale=None,
+        )
+        for name, value in expected.items():
+            self.assertAlmostEqual(raw_track2_score(draws, realized)[name], value)
+
+
+class SavedForecastTest(unittest.TestCase):
+    def setUp(self):
+        self.frame = panel([(1, 10), (2, 20), (3, 30)])
+        self.card = historical_cases(
+            self.frame, assets=["B", "A"], horizons=[1],
+            target_type="level", origins=["2024-01-02"],
+        )[0].card
+        self.draws = pd.DataFrame(
+            (draw, asset, 1, value)
+            for draw in range(200)
+            for asset, value in (("A", 3.0), ("B", 30.0))
+        ).rename(columns={0: "draw", 1: "asset", 2: "horizon", 3: "value"})
+
+    def test_saved_draws_follow_card_grid(self):
+        matrix = samples_from_frame(self.draws.sample(frac=1, random_state=4), self.card)
+        self.assertEqual(matrix.shape, (200, 2))
+        self.assertEqual(matrix[0].tolist(), [30.0, 3.0])
+        with self.assertRaisesRegex(ValueError, "duplicate"):
+            samples_from_frame(pd.concat([self.draws, self.draws.iloc[:1]]), self.card)
+        with self.assertRaisesRegex(ValueError, "grid"):
+            samples_from_frame(self.draws.iloc[:-1], self.card)
+
+    def test_cli_writes_unranked_report(self):
+        out = Path("report.json")
+        with patch("off_the_tape.cli.pd.read_parquet", side_effect=[self.frame, self.draws]), \
+             patch("pathlib.Path.mkdir"), patch("pathlib.Path.write_text") as write:
+            status = main([
+                "--panel", "panel.parquet", "--forecasts", "forecasts",
+                "--assets", "B", "A", "--horizons", "1", "--target-type", "level",
+                "--origins", "2024-01-02", "--output", str(out),
+            ])
+        self.assertEqual(status, 0)
+        report = json.loads(write.call_args.args[0])
+        self.assertFalse(report["rankable"])
+        self.assertEqual(report["cases"][0]["realized"], [30.0, 3.0])
 
 
 if __name__ == "__main__":
