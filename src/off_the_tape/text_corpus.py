@@ -39,7 +39,8 @@ class TextCorpus:
 
 def load_corpus(unit_dir: Path, asof: date) -> TextCorpus:
     """Never read a document whose indexed public timestamp is after ``asof``."""
-    text_dir = (Path(unit_dir) / "text").resolve()
+    root = Path(unit_dir)
+    text_dir = (root if (root / "corpus_index.json").is_file() else root / "text").resolve()
     index = json.loads((text_dir / "corpus_index.json").read_text(encoding="utf-8"))
     frozen_asof = date.fromisoformat(index["asof"])
     if asof > frozen_asof:
