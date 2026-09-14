@@ -176,5 +176,32 @@ configurable prior-window deltas, and sanity warnings and writes evidence to
 `reports/text_state_diagnostics.json`. It does not call the forecaster or
 modify forecast distributions.
 
+The first runnable Track 2 agent composes PCA joint numeric paths with a
+bounded, family-aware macro conditioner. The `forecast` entry point parses the
+unit's `card.toml`, loads the exact target assets and horizons, selects dated
+text, and writes `forecast.parquet`, `forecast_meta.json`, and
+`forecast_rationale.md`. Without `MODEL_ENDPOINT`, extraction falls back to a
+neutral state and the numeric forecast remains valid. `--numeric-only` bypasses
+text inference and yields exactly the same base draws at a fixed seed.
+
+```powershell
+forecast --panels "$Track2\units\t2-F3-election-2024-joint\panels" `
+  --text "$Track2\units\t2-F3-election-2024-joint\text" `
+  --asof 2024-10-31 --out reports\rehearsal_f3\forecast.parquet
+```
+
+`MacroConditioner` exposes separately ablatable mean, volatility, skew,
+shock, and common-factor adjustments. Its defaults are deliberately small and
+confidence-gated. Run the chronological local comparison with:
+
+```powershell
+python -m experiments.macro_ablation --track2-root "$Track2"
+```
+
+The method, held-out ablations, limitations, and public-unit gate checks are
+recorded in [conditioning backtest notes](docs/conditioning_backtest_notes.md).
+The current offline-proxy experiment does not support enabling text
+conditioning as the competition default.
+
 Run tests with `python -m pytest` after installing dependencies. The in-memory
 unit tests can also run with `python -m unittest discover -s tests`.
