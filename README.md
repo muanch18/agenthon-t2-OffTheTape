@@ -4,8 +4,8 @@ This repository currently provides a local historical evaluation harness. It cre
 pseudo-cards from a full historical panel, passes only observations through each
 as-of date to a forecasting callback, constructs later outcomes, and scores saved
 joint draws. A deliberately simple numeric baseline samples whole historical
-cross-asset change rows and produces 1,000 joint scenarios. The LLM/text
-component in [the plan](docs/plan.md) is not implemented yet.
+cross-asset change rows and produces 1,000 joint scenarios. A separate text
+research pipeline extracts macro state; it does not alter either numeric model.
 
 The input panel must be long-format Parquet with `date`, `asset`, and `value`
 columns, as in the [Track 2 public repository](https://github.com/Agenthon-2026/track2-forecasting-public).
@@ -131,6 +131,50 @@ The single-cell score uses the published weight redistribution. Scores are
 are unavailable locally, and raw scores from different panels or units should
 not be compared as leaderboard scores. The summary averages only the cases
 in one invocation.
+
+The text pipeline reads each practice unit's `text/corpus_index.json` and only
+documents whose indexed publication timestamp is on or before the requested
+as-of date. [Corpus inspection notes](docs/text_corpus_notes.md) describe the
+actual file types and sizes. `DocumentSelector` ranks eligible documents by
+recency, source/type, and family/panel keywords, then sends bounded excerpts
+to an OpenAI-style `MODEL_ENDPOINT/chat/completions`. Set `MODEL_NAME` for the
+organizer model. The prompt asks for macro and regime signals only; the strict
+`MacroState` schema and cited document IDs are validated before accepting a
+response. Invalid output or an unavailable endpoint yields a neutral state.
+
+```python
+from datetime import date
+from pathlib import Path
+from off_the_tape.macro_extractor import extract_macro_state, extract_with_prior
+
+unit = Path(r"C:\path\to\track2-forecasting-public\units\t2-F1-cpi-glidepath-2023")
+result = extract_macro_state(unit, asof=date(2023, 7, 12),
+                             family="T2-F1", panel_id="rates_daily")
+comparison = extract_with_prior(unit, asof=date(2023, 7, 12),
+                                window_days=60, family="T2-F1",
+                                panel_id="rates_daily")
+neutral = extract_macro_state(unit, asof=date(2023, 7, 12),
+                              text_enabled=False)
+```
+
+Validated outputs are cached under `.cache/macro_state/` using the full eligible
+corpus content and metadata hashes, as-of date, selected excerpts, model name,
+seed, prompt/schema/selector versions, and selection settings. Thus a changed
+document, even one not selected for the prompt, invalidates the cache. The
+`text_enabled=False` path bypasses document loading and returns neutral state.
+
+To inspect F1–F4 examples locally, run:
+
+```powershell
+python -m experiments.text_state_diagnostics --track2-root "$Track2" --offline-heuristic
+```
+
+The explicit offline heuristic is a lexical **pipeline proxy**, not an LLM
+quality estimate or automatic fallback. With a configured `MODEL_ENDPOINT`,
+omit `--offline-heuristic` to test the model. The script prints period states,
+configurable prior-window deltas, and sanity warnings and writes evidence to
+`reports/text_state_diagnostics.json`. It does not call the forecaster or
+modify forecast distributions.
 
 Run tests with `python -m pytest` after installing dependencies. The in-memory
 unit tests can also run with `python -m unittest discover -s tests`.
