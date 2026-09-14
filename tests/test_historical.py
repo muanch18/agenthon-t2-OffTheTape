@@ -48,7 +48,7 @@ class HistoricalCasesTest(unittest.TestCase):
 
     def test_rejects_incomplete_history_and_future(self):
         frame = panel([(1, 10), (2, 20), (3, 30)])
-        with self.assertRaisesRegex(ValueError, "future observations"):
+        with self.assertRaisesRegex(ValueError, "business-day target"):
             historical_cases(frame, family="T2-F3", panel_id="rates_daily", assets=["A", "B"], horizons=[2], target_type="level", origins=["2024-01-02"])
         frame = frame.drop(frame[(frame.date == pd.Timestamp("2024-01-02")) & (frame.asset == "B")].index)
         with self.assertRaisesRegex(ValueError, "every panel date"):
@@ -75,6 +75,29 @@ class HistoricalCasesTest(unittest.TestCase):
         )[0]
         self.assertEqual(case.card.target_dates[0].isoformat(), "2024-01-08")
         self.assertEqual(case.realized.tolist(), [6.0])
+
+    def test_missing_business_day_target_does_not_shift_forward(self):
+        frame = panel([(1, 10), (2, 20), (3, 30), (4, 40), (5, 50), (6, 60)])
+        frame = frame.loc[frame.date != pd.Timestamp("2024-01-08")]
+        with self.assertRaisesRegex(ValueError, "business-day target"):
+            historical_cases(
+                frame, family="T2-F3", panel_id="rates_daily", assets=["A"],
+                horizons=[1], target_type="level", origins=["2024-01-05"],
+            )
+
+    def test_task_identity_is_validated(self):
+        frame = panel([(1, 10), (2, 20)])
+        frame["panel_id"] = "rates_daily"
+        with self.assertRaisesRegex(ValueError, "different panel_id"):
+            historical_cases(
+                frame, family="T2-F3", panel_id="g10_fx_daily", assets=["A"],
+                horizons=[1], target_type="level", origins=["2024-01-01"],
+            )
+        with self.assertRaisesRegex(ValueError, "Track 2 family"):
+            historical_cases(
+                frame, family="T2-F5", panel_id="rates_daily", assets=["A"],
+                horizons=[1], target_type="level", origins=["2024-01-01"],
+            )
 
 
 class BootstrapTest(unittest.TestCase):

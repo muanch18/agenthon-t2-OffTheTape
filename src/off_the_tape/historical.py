@@ -74,11 +74,11 @@ def historical_cases(
     target_type: TargetType,
     origins: Iterable[date | str],
 ) -> list[HistoricalCase]:
-    """Construct cases on the panel's common observed business-day index.
+    """Construct cases at exact weekday business-day offsets.
 
-    A horizon of h advances h observed panel dates, matching daily panel trading
-    observations. Every requested origin must exist and have all target dates; an
-    incomplete backtest fails instead of silently changing its denominator.
+    A horizon of h uses ``asof + pandas.BDay(h)``. Every requested origin and
+    target date must exist in the panel; a holiday or incomplete backtest fails
+    instead of silently shifting its target or changing its denominator.
     """
     asset_ids = tuple(assets)
     if family not in {"T2-F1", "T2-F2", "T2-F3", "T2-F4"}:
@@ -108,19 +108,20 @@ def historical_cases(
         if asof not in positions:
             raise ValueError(f"origin is absent from panel: {asof}")
         i = positions[asof]
-        if i + max(steps) >= len(dates):
-            raise ValueError(f"panel lacks future observations for {asof}")
-        future_dates = tuple(dates[i + h].date() for h in steps)
+        future_dates = tuple((dates[i] + pd.offsets.BDay(h)).date() for h in steps)
+        if any(target not in positions for target in future_dates):
+            raise ValueError(f"panel lacks a requested business-day target for {asof}")
         history = frame.loc[frame["date"] <= dates[i]].copy().reset_index(drop=True)
         card = PseudoCard(family, panel_id, asof, history, asset_ids, steps, target_type, future_dates)
         outcome = []
         for asset in asset_ids:
             series = wide[asset].to_numpy(dtype=float)
-            for h in steps:
+            for target in future_dates:
+                end = positions[target]
                 if target_type == "level":
-                    outcome.append(float(series[i + h]))
+                    outcome.append(float(series[end]))
                 else:
-                    daily = series[i + 1 : i + h + 1]
+                    daily = series[i + 1 : end + 1]
                     if np.any(daily <= -1):
                         raise ValueError("log_return requires daily simple returns greater than -1")
                     outcome.append(float(np.log1p(daily).sum()))
