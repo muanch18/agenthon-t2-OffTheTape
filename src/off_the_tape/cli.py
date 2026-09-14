@@ -43,6 +43,8 @@ def samples_from_frame(frame: pd.DataFrame, card: PseudoCard) -> np.ndarray:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--panel", type=Path, required=True, help="full historical long-format Parquet panel")
+    parser.add_argument("--panel-id", required=True)
+    parser.add_argument("--family", choices=("T2-F1", "T2-F2", "T2-F3", "T2-F4"), required=True)
     parser.add_argument("--forecasts", type=Path, required=True, help="directory of YYYY-MM-DD.parquet forecast files")
     parser.add_argument("--assets", nargs="+", required=True)
     parser.add_argument("--horizons", nargs="+", required=True, type=int)
@@ -52,7 +54,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     cases = historical_cases(
-        pd.read_parquet(args.panel), assets=args.assets, horizons=args.horizons,
+        pd.read_parquet(args.panel), family=args.family, panel_id=args.panel_id,
+        assets=args.assets, horizons=args.horizons,
         target_type=args.target_type, origins=args.origins,
     )
 

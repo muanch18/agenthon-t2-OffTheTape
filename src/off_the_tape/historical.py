@@ -18,6 +18,8 @@ TargetType = Literal["level", "log_return"]
 
 @dataclass(frozen=True)
 class PseudoCard:
+    family: str
+    panel_id: str
     asof: date
     panel: pd.DataFrame
     assets: tuple[str, ...]
@@ -49,6 +51,8 @@ def _validated_panel(panel: pd.DataFrame, assets: tuple[str, ...]) -> pd.DataFra
     frame["date"] = pd.to_datetime(frame["date"], errors="raise")
     if frame["date"].isna().any() or (frame["date"] != frame["date"].dt.normalize()).any():
         raise ValueError("panel dates must be non-null calendar dates")
+    if frame["date"].dt.dayofweek.ge(5).any():
+        raise ValueError("daily panel dates must be weekdays")
     if frame.duplicated(["date", "asset"]).any():
         raise ValueError("panel has duplicate date/asset rows")
     frame["value"] = pd.to_numeric(frame["value"], errors="raise")
@@ -63,6 +67,8 @@ def _validated_panel(panel: pd.DataFrame, assets: tuple[str, ...]) -> pd.DataFra
 def historical_cases(
     panel: pd.DataFrame,
     *,
+    family: str,
+    panel_id: str,
     assets: Iterable[str],
     horizons: Iterable[int],
     target_type: TargetType,
@@ -75,6 +81,12 @@ def historical_cases(
     incomplete backtest fails instead of silently changing its denominator.
     """
     asset_ids = tuple(assets)
+    if family not in {"T2-F1", "T2-F2", "T2-F3", "T2-F4"}:
+        raise ValueError("family must be a Track 2 family")
+    if not panel_id:
+        raise ValueError("panel_id must be nonempty")
+    if "panel_id" in panel.columns and not panel["panel_id"].eq(panel_id).all():
+        raise ValueError("panel contains a different panel_id")
     steps = tuple(horizons)
     if not steps or len(set(steps)) != len(steps) or any(
         isinstance(h, bool) or not isinstance(h, int) or h < 1 for h in steps
@@ -100,7 +112,7 @@ def historical_cases(
             raise ValueError(f"panel lacks future observations for {asof}")
         future_dates = tuple(dates[i + h].date() for h in steps)
         history = frame.loc[frame["date"] <= dates[i]].copy().reset_index(drop=True)
-        card = PseudoCard(asof, history, asset_ids, steps, target_type, future_dates)
+        card = PseudoCard(family, panel_id, asof, history, asset_ids, steps, target_type, future_dates)
         outcome = []
         for asset in asset_ids:
             series = wide[asset].to_numpy(dtype=float)
@@ -130,6 +142,8 @@ def evaluate(
         draws = np.asarray(forecast(case.card), dtype=float)
         result = raw_track2_score(draws, case.realized)
         results.append({
+            "family": case.card.family,
+            "panel_id": case.card.panel_id,
             "asof": case.card.asof.isoformat(),
             "target_dates": [d.isoformat() for d in case.card.target_dates],
             "assets": list(case.card.assets),
