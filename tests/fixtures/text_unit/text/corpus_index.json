@@ -1,0 +1,27 @@
+{
+  "card_id": "t2-TEST-text",
+  "asof": "2024-02-02",
+  "documents": [
+    {
+      "doc_id": "old-policy",
+      "timestamp": "2024-01-01",
+      "source": "Federal Reserve",
+      "doc_type": "fomc_statement",
+      "file": "old.txt"
+    },
+    {
+      "doc_id": "new-policy",
+      "timestamp": "2024-02-01",
+      "source": "Federal Reserve",
+      "doc_type": "fomc_statement",
+      "file": "new.txt"
+    },
+    {
+      "doc_id": "future-unread",
+      "timestamp": "2024-02-02",
+      "source": "Federal Reserve",
+      "doc_type": "fomc_statement",
+      "file": "future-file-is-intentionally-absent.txt"
+    }
+  ]
+}
