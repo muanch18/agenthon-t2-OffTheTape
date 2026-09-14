@@ -68,6 +68,32 @@ preserving contemporaneous cross-asset dependence. The default lookback is 504
 observations. Its random seed is fixed per as-of date for reproducibility; the
 method does not model serial dependence, regimes, or text.
 
+The stronger numeric candidate is `PCAJointForecaster` in
+[`src/off_the_tape/pca_joint.py`](src/off_the_tape/pca_joint.py). It transforms
+rates to daily changes, FX levels to daily log returns, and factor daily simple
+returns to `log(1+r)` for cumulative-log-return targets. On the last 504
+pre-as-of observations it standardizes each series, decomposes the joint panel
+as `X_t = B f_t + e_t`, fits a clipped AR(1) to each factor, and resamples
+paired factor innovations and residuals in five-day blocks. It then simulates
+the full path once per draw and reads every requested horizon from that same
+path. The empirical shocks retain observed extremes; they do not extrapolate
+beyond the historical shock pool.
+
+```python
+from off_the_tape.pca_joint import PCAJointForecaster
+
+model = PCAJointForecaster(mode="difference")  # "log_price" for FX
+forecast = model.forecast(cases[0].card)
+draws = forecast.draws                  # [1000, assets * horizons]
+paths = forecast.paths                  # [1000, max_horizon, assets]
+diagnostics = forecast.diagnostics
+```
+
+The diagnostics include PCA explained-variance ratios, the standardized
+loading matrix, residual covariance in native daily-change/return units,
+historical and simulated marginal volatility and cross-asset correlation, and
+the 1%, 5%, 95%, and 99% quantiles of each asset/horizon forecast cell.
+
 Run the UST/G10 example after cloning the public Track 2 repository and
 installing this package:
 
@@ -83,6 +109,20 @@ for UST 2Y/5Y/10Y/30Y and EUR/GBP/AUD/NZD. The supplied panels contain later
 observations for constructing retrospective outcomes; each forecast still
 receives only its own pre-as-of history. The script prints CRPS, variogram,
 tail pinball loss, and composite score per case.
+
+Compare the bootstrap and PCA candidate on exactly those same pseudo-cards:
+
+```powershell
+python -m experiments.compare_joint_forecasters `
+  --rates-panel "$Track2\units\t2-F1-hawkish-cut-2024\rates_daily.parquet" `
+  --fx-panel "$Track2\units\t2-F3-election-2024-joint\g10_fx_daily.parquet"
+```
+
+It prints mean component scores by panel and model, plus origins where PCA has
+a worse composite. It saves per-origin scores and all PCA diagnostics to
+`reports/pca_joint_diagnostics.json` by default. Both methods use a 504-row
+lookback, 1,000 draws, the same four cutoffs, and the same 21/63-business-day
+grid. Raw means are meaningful within one panel/grid, not between UST and FX.
 
 Reports use the [shared toolkit's CRPS and variogram functions](https://github.com/Agenthon-2026/Agenthon2026-public)
 and the [Track 2 scorer's pinball tail loss](https://github.com/Agenthon-2026/track2-forecasting-public).

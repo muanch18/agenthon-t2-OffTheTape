@@ -82,6 +82,9 @@ class PCAJointForecasterTest(unittest.TestCase):
         self.assertGreater(diag["historical_correlation"][0][1], 0.8)
         self.assertGreater(diag["simulated_correlation"][0][1], 0.5)
         self.assertLess(diag["simulated_correlation"][0][2], -0.4)
+        daily = forecast.daily_transforms[:, :, 0].ravel()
+        standardized = (daily - daily.mean()) / daily.std()
+        self.assertGreater(np.mean(standardized ** 4), 3.3)
 
     def test_fx_paths_are_positive_reconstructed_levels(self):
         _, case = make_case("fx")

@@ -141,6 +141,8 @@ class PCAJointForecaster:
             "training_start": transformed_dates[-len(training)].date().isoformat(),
             "training_end": transformed_dates[-1].date().isoformat(),
             "training_observations": len(training),
+            "n_draws": self.n_draws,
+            "innovation_block_size": block,
             "n_factors": k,
             "explained_variance_ratio": explained,
             "loading_matrix_standardized": loadings.tolist(),
@@ -168,6 +170,12 @@ class PCAJointForecaster:
 
 
 def _correlation(values: np.ndarray) -> np.ndarray:
-    if values.shape[1] == 1:
-        return np.ones((1, 1))
-    return np.corrcoef(values, rowvar=False)
+    centered = values - values.mean(axis=0)
+    covariance = centered.T @ centered / max(len(values) - 1, 1)
+    volatility = np.sqrt(np.diag(covariance))
+    denominator = volatility[:, None] * volatility[None, :]
+    correlation = np.divide(
+        covariance, denominator, out=np.zeros_like(covariance), where=denominator > 0
+    )
+    np.fill_diagonal(correlation, 1.0)
+    return np.clip(correlation, -1.0, 1.0)
