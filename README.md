@@ -3,12 +3,13 @@
 This repository currently provides a local historical evaluation harness. It creates
 pseudo-cards from a full historical panel, passes only observations through each
 as-of date to a forecasting callback, constructs later outcomes, and scores saved
-joint draws. The LLM and numeric forecasting components in [the plan](docs/plan.md)
-are not implemented yet.
+joint draws. A deliberately simple numeric baseline samples whole historical
+cross-asset change rows and produces 1,000 joint scenarios. The LLM/text
+component in [the plan](docs/plan.md) is not implemented yet.
 
 The input panel must be long-format Parquet with `date`, `asset`, and `value`
 columns, as in the [Track 2 public repository](https://github.com/Agenthon-2026/track2-forecasting-public).
-An optional `panel_id` column is ignored. The public practice units contain
+An optional `panel_id` column is checked against the requested panel ID. The public practice units contain
 cutoff panels but **no answer keys**, so this harness needs a separate full
 historical panel for retrospective runs. It does not reconstruct or publish
 official sealed outcomes. Keep local reports and full panels out of Git.
@@ -26,6 +27,7 @@ To score forecasts already saved for a historical panel:
 
 ```powershell
 off-the-tape-backtest --panel C:\data\rates_daily.parquet `
+  --panel-id rates_daily --family T2-F3 `
   --forecasts C:\data\historical_draws --assets UST_2Y UST_10Y `
   --horizons 21 63 --target-type level `
   --origins 2018-01-31 2018-04-30 --output reports\rates.json
@@ -39,20 +41,48 @@ draws are required. The same source panel can be used programmatically:
 ```python
 from off_the_tape.historical import evaluate, historical_cases
 
-cases = historical_cases(panel, assets=["UST_2Y", "UST_10Y"],
+cases = historical_cases(panel, family="T2-F3", panel_id="rates_daily",
+                         assets=["UST_2Y", "UST_10Y"],
                          horizons=[21], target_type="level",
                          origins=["2018-01-31"])
-results = evaluate(cases, lambda card: make_joint_draws(card))
+from off_the_tape.bootstrap import JointRowBootstrap
+results = evaluate(cases, JointRowBootstrap(mode="difference"))
 ```
 
 `make_joint_draws` receives a `PseudoCard` containing only history through
 `card.asof`, and returns a NumPy matrix with shape `(n_draws,
 len(card.assets) * len(card.horizons))`. Columns follow asset-major,
-horizon-minor order. For `level`, the outcome is the value after `h` observed
-panel business days. For `log_return`, panel values are daily simple returns;
-the outcome is the sum of `log(1 + r)` over the following `h` observations.
+horizon-minor order. A horizon uses the exact weekday date `asof + BDay(h)`;
+if that date is absent from the panel, the case fails rather than shifting its
+target. For `level`, the outcome is the value on that target date. For
+`log_return`, panel values are daily simple returns; the outcome is the sum of
+`log(1 + r)` over available observations after as-of through the target date.
 All requested assets must be present on every panel date. Missing or incomplete
 origins fail instead of being silently excluded.
+
+The bootstrap has three modes: `difference` adds resampled daily level changes
+(suited to UST yields), `log_price` compounds resampled log-price changes
+(suited to positive FX rates), and `simple_return` sums `log(1+r)` from daily
+simple-return panels. Each simulated day samples one **joint** historical row,
+preserving contemporaneous cross-asset dependence. The default lookback is 504
+observations. Its random seed is fixed per as-of date for reproducibility; the
+method does not model serial dependence, regimes, or text.
+
+Run the UST/G10 example after cloning the public Track 2 repository and
+installing this package:
+
+```powershell
+$Track2 = 'C:\path\to\track2-forecasting-public'
+python experiments\bootstrap_backtest.py `
+  --rates-panel "$Track2\units\t2-F1-hawkish-cut-2024\rates_daily.parquet" `
+  --fx-panel "$Track2\units\t2-F3-election-2024-joint\g10_fx_daily.parquet"
+```
+
+It evaluates 21- and 63-business-day forecasts at four historical as-of dates
+for UST 2Y/5Y/10Y/30Y and EUR/GBP/AUD/NZD. The supplied panels contain later
+observations for constructing retrospective outcomes; each forecast still
+receives only its own pre-as-of history. The script prints CRPS, variogram,
+tail pinball loss, and composite score per case.
 
 Reports use the [shared toolkit's CRPS and variogram functions](https://github.com/Agenthon-2026/Agenthon2026-public)
 and the [Track 2 scorer's pinball tail loss](https://github.com/Agenthon-2026/track2-forecasting-public).
