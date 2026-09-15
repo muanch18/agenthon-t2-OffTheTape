@@ -150,6 +150,13 @@ def readiness_markdown(report: dict[str, object]) -> str:
         lines.extend(f"- `{row['unit_id']}` ({row['failure_category']}): {row['error_message']}" for row in failures)
     else:
         lines.append("- No public-unit agent or g0-g3 failures.")
+    fallbacks = [row for row in rows if row["fallback_used"]]
+    if fallbacks:
+        lines.append("- Safe numeric fallback activations: " + ", ".join(
+            f"`{row['unit_id']}` ({row['failure_category']})" for row in fallbacks
+        ) + ".")
+    if report["public_units_tested"] == 104:
+        lines.append("- Coverage is all 103 practice units plus the worked exemplar directory.")
     if not report["host"]["docker_available"]:
         lines.append("- Docker is not installed on this host, so image build, size, cold start, and network-none container execution remain unverified.")
     lines.extend(["- The full smoke wrapper uses a POSIX no-follow manifest walk and cannot run on Windows; this runner invokes the official Track 2 g0-g3 functions directly.",
