@@ -203,5 +203,40 @@ recorded in [conditioning backtest notes](docs/conditioning_backtest_notes.md).
 The current offline-proxy experiment does not support enabling text
 conditioning as the competition default.
 
+## Frozen submission candidate and rehearsal
+
+The current candidate is frozen in
+[`candidate.py`](src/off_the_tape/candidate.py): PCA joint paths, 1,000 draws,
+root seed 2026, and text conditioning disabled. The ordinary `forecast` command
+therefore makes no model call. Use `--text-conditioned` only for explicit
+research runs; `--numeric-only` remains accepted for clarity. The contract
+review and corrected discrepancies are in
+[`docs/contract_audit.md`](docs/contract_audit.md).
+
+Before serialization, the agent validates the complete asset/horizon grid,
+draw floor, contiguous IDs, dtypes, finite values, non-degenerate marginals,
+broad magnitude bounds, and positive FX levels. PCA failures use a deterministic
+joint empirical fallback with a volatility floor. Every stochastic production
+component derives from the CLI's root `--seed`.
+
+Run every public unit and generate `reports/submission_readiness.md` with:
+
+```powershell
+python scripts\smoke_all.py --track2-root "$Track2"
+```
+
+This records per-unit gates, runtime stages, fallbacks, calls, and token counts.
+On Windows it calls the Track 2 scorer's official g0–g3 functions directly,
+because the shared smoke wrapper requires POSIX no-follow directory flags.
+
+The submission [`Dockerfile`](Dockerfile) uses Python 3.13, exact dependency
+pins, a non-root user, no runtime installation, and the required
+`qfbench2.interface_version="2.0"` label. On a Linux host with Docker, run the
+representative network-isolated rehearsal, or append `--all`:
+
+```powershell
+python scripts\rehearse_submission.py --track2-root "$Track2"
+```
+
 Run tests with `python -m pytest` after installing dependencies. The in-memory
 unit tests can also run with `python -m unittest discover -s tests`.

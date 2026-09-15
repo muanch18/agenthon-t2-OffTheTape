@@ -1,0 +1,11 @@
+.git
+.deps
+.cache
+.pytest_cache
+reports
+tests
+docs
+experiments
+scripts
+*.parquet
+__pycache__
