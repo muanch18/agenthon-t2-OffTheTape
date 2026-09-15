@@ -177,6 +177,23 @@ class TextPipelineTest(unittest.TestCase):
         self.assertEqual(payload["model"], "house")
         self.assertNotIn("tools", payload)
 
+    def test_network_none_disables_endpoint_and_model_timeout_falls_back(self):
+        with patch.dict("os.environ", {"QFBENCH_NETWORK": "none", "MODEL_ENDPOINT": "http://model:8000/v1"}):
+            self.assertIsNone(EndpointModel.from_environment())
+
+        class TimeoutModel(FakeModel):
+            def complete(self, **kwargs):
+                self.calls += 1
+                raise TimeoutError("bounded timeout")
+
+        result = extract_macro_state(
+            UNIT, asof=date(2024, 2, 1), client=TimeoutModel(),
+            model_name="timeout", cache_dir=None,
+        )
+        self.assertEqual(result.source, "fallback")
+        self.assertEqual(result.model_calls, 1)
+        self.assertEqual(result.state, MacroState.neutral())
+
 
 if __name__ == "__main__":
     unittest.main()

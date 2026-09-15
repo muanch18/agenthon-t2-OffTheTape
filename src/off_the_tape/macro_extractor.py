@@ -8,6 +8,7 @@ import os
 from dataclasses import asdict, dataclass
 from datetime import date, timedelta
 from pathlib import Path
+from time import perf_counter
 from typing import Any, Mapping
 
 from .macro_cache import MacroCache, cache_key
@@ -29,6 +30,12 @@ class MacroExtraction:
     source: str  # llm, heuristic, cache, fallback, ablated
     cache_key: str | None = None
     reason: str | None = None
+    model_calls: int = 0
+    input_tokens: int = 0
+    output_tokens: int = 0
+    latency_seconds: float = 0.0
+    selection_seconds: float = 0.0
+    parsing_seconds: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
         result = asdict(self)
@@ -109,18 +116,22 @@ def extract_macro_state(
     seed: int = 2026,
 ) -> MacroExtraction:
     """Extract macro-only signals; invalid/unavailable model output is neutral."""
+    selection_started = perf_counter()
     if not text_enabled:
         return MacroExtraction(asof, MacroState.neutral(), (), (), "ablated")
     corpus = load_corpus(Path(unit_dir), asof)
     chosen_selector = selector or DocumentSelector()
     selected = chosen_selector.select(corpus, family=family, panel_id=panel_id)
+    selection_seconds = perf_counter() - selection_started
     ids = tuple(doc.doc_id for doc in selected)
     if not selected:
-        return MacroExtraction(asof, MacroState.neutral(), (), (), "fallback", reason="no_eligible_documents")
+        return MacroExtraction(asof, MacroState.neutral(), (), (), "fallback",
+                               reason="no_eligible_documents", selection_seconds=selection_seconds)
     model = client or EndpointModel.from_environment()
     name = model_name or os.environ.get("MODEL_NAME") or "unspecified"
     if model is None:
-        return MacroExtraction(asof, MacroState.neutral(), (), ids, "fallback", reason="no_model_endpoint")
+        return MacroExtraction(asof, MacroState.neutral(), (), ids, "fallback",
+                               reason="no_model_endpoint", selection_seconds=selection_seconds)
     key = cache_key({
         "information_hash": corpus.information_hash,
         "selected": [(doc.doc_id, doc.sha256, doc.excerpt) for doc in selected],
@@ -141,20 +152,28 @@ def extract_macro_state(
         if cached is not None:
             try:
                 state, evidence = _validate_payload(cached, set(ids))
-                return MacroExtraction(asof, state, evidence, ids, "cache", key)
+                return MacroExtraction(asof, state, evidence, ids, "cache", key,
+                                       selection_seconds=selection_seconds)
             except (TypeError, ValueError):
                 pass
     user_prompt = build_user_prompt(
         asof=asof.isoformat(), family=family, panel_id=panel_id, documents=selected
     )
+    call_started = perf_counter()
+    input_tokens = (len(SYSTEM_PROMPT) + len(user_prompt) + 3) // 4
     try:
         raw = model.complete(
             system=SYSTEM_PROMPT, user=user_prompt, documents=selected,
             model_name=name, seed=seed,
         )
+        parse_started = perf_counter()
         state, evidence = _parse_output(raw, set(ids))
+        parsing_seconds = perf_counter() - parse_started
     except Exception:
-        return MacroExtraction(asof, MacroState.neutral(), (), ids, "fallback", key, "invalid_or_failed_model_output")
+        return MacroExtraction(asof, MacroState.neutral(), (), ids, "fallback", key,
+                               "invalid_or_failed_model_output", 1, input_tokens, 0,
+                               perf_counter() - call_started,
+                               selection_seconds=selection_seconds)
     payload = {
         "schema_version": SCHEMA_VERSION,
         "state": state.to_dict(),
@@ -165,7 +184,9 @@ def extract_macro_state(
             cache.put(key, payload)
         except OSError:
             pass  # A read-only inference mount must not make extraction fail.
-    return MacroExtraction(asof, state, evidence, ids, model.mode, key)
+    return MacroExtraction(asof, state, evidence, ids, model.mode, key, None, 1,
+                           input_tokens, (len(raw) + 3) // 4, perf_counter() - call_started,
+                           selection_seconds, parsing_seconds)
 
 
 def extract_with_prior(

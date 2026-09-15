@@ -43,11 +43,13 @@ class EndpointModel:
     """POST to MODEL_ENDPOINT/chat/completions; no vendor key or retrieval tools."""
 
     endpoint: str
-    timeout_seconds: int = 45
+    timeout_seconds: int = 20
     mode: str = "llm"
 
     @classmethod
     def from_environment(cls) -> EndpointModel | None:
+        if os.environ.get("QFBENCH_NETWORK", "").casefold() == "none":
+            return None
         endpoint = os.environ.get("MODEL_ENDPOINT")
         return cls(endpoint) if endpoint else None
 
