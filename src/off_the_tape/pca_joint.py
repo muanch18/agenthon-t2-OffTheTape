@@ -8,6 +8,7 @@ historical blocks, retaining cross-asset extremes and some serial structure.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from time import perf_counter
 
 import numpy as np
 
@@ -42,6 +43,7 @@ class PCAJointForecaster:
         return self.forecast(card).draws
 
     def forecast(self, card: PseudoCard) -> PCAForecast:
+        started = perf_counter()
         if self.mode == "simple_return" and card.target_type != "log_return":
             raise ValueError("simple_return mode requires a log_return target")
         if self.mode != "simple_return" and card.target_type != "level":
@@ -100,6 +102,7 @@ class PCAJointForecaster:
         # Pair factor shocks with same-date residuals before block sampling.
         innovations = np.concatenate([factor_shocks, residuals[1:]], axis=1)
         innovations -= innovations.mean(axis=0)
+        fit_seconds = perf_counter() - started
 
         horizon = max(card.horizons)
         block = min(self.block_size, len(innovations))
@@ -115,6 +118,7 @@ class PCAJointForecaster:
             factor_state = intercept + slope * factor_state + sampled[:, day, :k]
             standardized_day = factor_state @ loadings.T + sampled[:, day, k:]
             daily[:, day, :] = center + scale * standardized_day
+        simulation_seconds = perf_counter() - started - fit_seconds
 
         cumulative = np.cumsum(daily, axis=1)
         if self.mode == "difference":
@@ -144,6 +148,8 @@ class PCAJointForecaster:
             "n_draws": self.n_draws,
             "innovation_block_size": block,
             "n_factors": k,
+            "fit_seconds": fit_seconds,
+            "simulation_seconds": simulation_seconds,
             "explained_variance_ratio": explained,
             "loading_matrix_standardized": loadings.tolist(),
             "ar1_slope": slope.tolist(),

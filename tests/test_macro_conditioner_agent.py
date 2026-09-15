@@ -15,6 +15,7 @@ from off_the_tape.agent import TaskSpec, Track2Agent, main
 from off_the_tape.historical import PseudoCard
 from off_the_tape.macro_conditioner import MacroConditioner, NumericContext
 from off_the_tape.macro_state import MacroState
+from off_the_tape.output_validation import validate_draw_matrix
 
 
 class ConditioningTest(unittest.TestCase):
@@ -114,7 +115,7 @@ class AgentTest(unittest.TestCase):
         args = (task, self.root / "unit" / "panels", self.root / "unit" / "text", self.asof)
         numeric = agent.forecast(*args, seed=5, numeric_only=True)
         ablated = agent.forecast(*args, seed=5, macro_override=MacroState.neutral())
-        fallback = agent.forecast(*args, seed=5)
+        fallback = agent.forecast(*args, seed=5, numeric_only=False)
         self.assertTrue(np.array_equal(numeric.draws, ablated.draws))
         self.assertTrue(np.array_equal(numeric.draws, fallback.draws))
         self.assertEqual(fallback.macro.source, "fallback")
@@ -149,6 +150,56 @@ class AgentTest(unittest.TestCase):
         second = agent.forecast(task, path.parent, self.root / "unit" / "text", origin,
                                 seed=91, numeric_only=True)
         self.assertTrue(np.array_equal(first.draws, second.draws))
+
+    def test_constant_short_duplicate_panel_uses_valid_safe_fallback(self):
+        path = self.root / "unit" / "panels" / "rates_daily.parquet"
+        frame = pd.read_parquet(path)
+        frame = frame.groupby("asset", group_keys=False).tail(10).copy()
+        frame["value"] = frame.groupby("asset")["value"].transform("last")
+        frame = pd.concat([frame, frame.iloc[[0]]], ignore_index=True)
+        frame.to_parquet(path, index=False)
+        task = replace(TaskSpec.from_card(self.root / "unit" / "card.toml"),
+                       asof=pd.Timestamp(frame["date"].max()).date())
+        result = Track2Agent().forecast(task, path.parent, self.root / "unit" / "text",
+                                        task.asof, seed=12, numeric_only=True)
+        self.assertTrue(result.fallback_used)
+        validate_draw_matrix(result.draws, task, 1000)
+        self.assertTrue(np.all(np.ptp(result.draws, axis=0) > 0))
+
+    def test_available_endpoint_is_called_once_in_opt_in_mode(self):
+        (self.root / "unit" / "text" / "statement.txt").write_text(
+            "Policy became more restrictive.", encoding="utf-8")
+        (self.root / "unit" / "text" / "corpus_index.json").write_text(json.dumps({
+            "card_id": "fixture", "asof": str(self.asof), "documents": [{
+                "doc_id": "statement", "timestamp": str(self.asof),
+                "source": "Federal Reserve", "doc_type": "fomc_statement",
+                "file": "statement.txt",
+            }],
+        }), encoding="utf-8")
+
+        class Model:
+            mode = "llm"
+            calls = 0
+
+            def complete(self, **kwargs):
+                self.calls += 1
+                state = MacroState.neutral().to_dict()
+                state.update(policy_stance=.6, confidence=.8)
+                return json.dumps({"schema_version": "1", "state": state, "evidence": [{
+                    "signal": "policy_stance", "value": .6,
+                    "supporting_docs": ["statement"], "summary": "Policy language tightened.",
+                }]})
+
+        model = Model()
+        task = TaskSpec.from_card(self.root / "unit" / "card.toml")
+        result = Track2Agent(text_client=model, macro_cache_dir=self.root / "macro_cache").forecast(
+            task, self.root / "unit" / "panels", self.root / "unit" / "text",
+            self.asof, seed=22, numeric_only=False,
+        )
+        self.assertEqual(model.calls, 1)
+        self.assertEqual(result.macro.source, "llm")
+        self.assertEqual(result.diagnostics["model_calls"], 1)
+        self.assertFalse(np.array_equal(result.draws, result.base_draws))
 
 
 if __name__ == "__main__":
