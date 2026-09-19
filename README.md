@@ -238,5 +238,9 @@ representative network-isolated rehearsal, or append `--all`:
 python scripts\rehearse_submission.py --track2-root "$Track2"
 ```
 
+The rehearsal runs both the agent and the official `qfbench2-smoke` wrapper in
+Linux containers with `--network=none`. Use `--skip-build` to reuse an image
+that has already been built with the selected `--image` tag.
+
 Run tests with `python -m pytest` after installing dependencies. The in-memory
 unit tests can also run with `python -m unittest discover -s tests`.

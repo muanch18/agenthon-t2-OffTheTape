@@ -28,10 +28,13 @@ def main() -> int:
     parser.add_argument("--image", default="off-the-tape:candidate")
     parser.add_argument("--output-root", type=Path, default=Path("reports/docker_rehearsal"))
     parser.add_argument("--all", action="store_true")
+    parser.add_argument("--skip-build", action="store_true")
     args = parser.parse_args()
     if shutil.which("docker") is None:
         parser.error("docker is not installed or not on PATH")
-    run(["docker", "build", "--tag", args.image, "."])
+    output_root = args.output_root if args.output_root.is_absolute() else Path.cwd() / args.output_root
+    if not args.skip_build:
+        run(["docker", "build", "--tag", args.image, "."])
     units = sorted(path for path in (args.track2_root / "units").iterdir()
                    if (path / "card.toml").is_file()) if args.all else [
         args.track2_root / "units" / name for name in REPRESENTATIVES
@@ -42,7 +45,7 @@ def main() -> int:
             import tomllib
             card = tomllib.load(stream)
         asof = card["provenance"]["data_cutoff"]
-        output = (args.output_root / unit.name).resolve()
+        output = output_root / unit.name
         output.mkdir(parents=True, exist_ok=True)
         for name in ("forecast.parquet", "forecast_meta.json", "forecast_rationale.md"):
             (output / name).unlink(missing_ok=True)
@@ -52,12 +55,17 @@ def main() -> int:
              "--mount", f"type=bind,src={output},dst=/output",
              args.image, "forecast", "--panels", "/input/panels", "--text", "/input/text",
              "--asof", asof, "--out", "/output/forecast.parquet"])
-        run(["qfbench2-smoke", str(unit), str(output), "--track", "forecasting"])
+        # Run the official wrapper in Linux. Its no-follow manifest walk uses
+        # POSIX directory-descriptor semantics that are unavailable on Windows.
+        run(["docker", "run", "--rm", "--network=none",
+             "--mount", f"type=bind,src={unit.resolve()},dst=/input,readonly",
+             "--mount", f"type=bind,src={output},dst=/output,readonly",
+             args.image, "qfbench2-smoke", "/input", "/output", "--track", "forecasting"])
         records.append({"unit_id": unit.name, "runtime_seconds": time.perf_counter() - started,
                         "outputs": sorted(path.name for path in output.iterdir())})
         print(f"PASS {unit.name} {records[-1]['runtime_seconds']:.2f}s")
-    args.output_root.mkdir(parents=True, exist_ok=True)
-    (args.output_root / "rehearsal.json").write_text(json.dumps(records, indent=2) + "\n", encoding="utf-8")
+    output_root.mkdir(parents=True, exist_ok=True)
+    (output_root / "rehearsal.json").write_text(json.dumps(records, indent=2) + "\n", encoding="utf-8")
     return 0
 
 
