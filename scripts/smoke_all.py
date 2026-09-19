@@ -110,6 +110,9 @@ def run(root: Path, output_root: Path, *, limit: int | None = None) -> dict[str,
 
 def readiness_markdown(report: dict[str, object]) -> str:
     rows = report["rows"]
+    docker = report.get("docker")
+    image_size = (f"{docker['image_size_bytes'] / 1_000_000:.1f} MB"
+                  if docker else "not measured (Docker unavailable)")
     lines = ["# Submission readiness", "", "## Candidate", "",
              "The frozen candidate is numeric-only PCA with 1,000 joint draws. Text conditioning is retained as an opt-in research mode and disabled by default because it did not improve held-out aggregate score.", "",
              "## Public-unit result", "",
@@ -124,7 +127,7 @@ def readiness_markdown(report: dict[str, object]) -> str:
              f"- Median input tokens: {report['input_tokens']['median']}",
              f"- Maximum input tokens: {report['input_tokens']['max']}",
              f"- Numeric fallback activations: {report['fallback_activations']}",
-             f"- Docker image size: {'not measured (Docker unavailable)' if not report['host']['docker_available'] else 'see rehearsal log'}",
+             f"- Docker image size: {image_size}",
              f"- Cold Python import/process time: {report['host'].get('cold_import_seconds', 0):.3f} s", "",
              "## Runtime components", "", "| Component | Median s | P90 s | Maximum s |", "|---|---:|---:|---:|"]
     timing_keys = (
@@ -144,6 +147,16 @@ def readiness_markdown(report: dict[str, object]) -> str:
             selected = [row for row in rows if row[field] == group]
             passed = sum(row["exit_code"] == 0 for row in selected)
             lines.append(f"| {group} | {passed} | {len(selected)} | {passed / max(len(selected), 1):.1%} |")
+    if docker:
+        runtime = docker["runtime_seconds"]
+        lines.extend(["", "## Docker rehearsal", "",
+                      f"- Image: `{docker['image']}`",
+                      f"- Docker Desktop / engine: {docker['desktop_version']} / {docker['engine_version']}",
+                      f"- Public units passed: {docker['public_units_passed']}/{docker['public_units_tested']}",
+                      f"- Median / P90 / worst container rehearsal: {runtime['median']:.3f} / {runtime['p90']:.3f} / {runtime['max']:.3f} s",
+                      f"- Network mode: `{docker['network_mode']}`",
+                      f"- Container identity: `{docker['container_user']}` (UID {docker['container_uid']})",
+                      f"- Official scorer: {docker['official_smoke']}"])
     lines.extend(["", "## Known issues", ""])
     failures = [row for row in rows if row["exit_code"]]
     if failures:
@@ -157,9 +170,9 @@ def readiness_markdown(report: dict[str, object]) -> str:
         ) + ".")
     if report["public_units_tested"] == 104:
         lines.append("- Coverage is all 103 practice units plus the worked exemplar directory.")
-    if not report["host"]["docker_available"]:
+    if not docker:
         lines.append("- Docker is not installed on this host, so image build, size, cold start, and network-none container execution remain unverified.")
-    lines.extend(["- The full smoke wrapper uses a POSIX no-follow manifest walk and cannot run on Windows; this runner invokes the official Track 2 g0-g3 functions directly.",
+    lines.extend(["- The host runner invokes the official Track 2 g0-g3 functions directly; the Docker rehearsal runs the full POSIX smoke wrapper inside Linux.",
                   "- Model-endpoint latency and token counts are zero for the frozen numeric-only candidate. Text-conditioned endpoint behavior is covered by unit tests, not a live organizer endpoint.", ""])
     return "\n".join(lines)
 
