@@ -46,13 +46,15 @@ class HardeningTest(unittest.TestCase):
     def test_docker_contract_is_pinned_and_excludes_research_data(self):
         root = Path(__file__).parents[1]
         dockerfile = (root / "Dockerfile").read_text(encoding="utf-8")
+        verifier = (root / "Dockerfile.verifier").read_text(encoding="utf-8")
         ignore = (root / ".dockerignore").read_text(encoding="utf-8")
         self.assertIn('FROM python:3.13-slim-bookworm', dockerfile)
         self.assertIn('qfbench2.interface_version="2.0"', dockerfile)
-        self.assertIn("83c6dc036bec03862b78e093bf8804d98964dad5", dockerfile)
-        self.assertIn("refs/tags/v2.4.0", dockerfile)
-        self.assertIn("reports", ignore)
-        self.assertIn("*.parquet", ignore)
+        self.assertNotIn("qfbench2-track-forecasting", dockerfile)
+        self.assertIn("83c6dc036bec03862b78e093bf8804d98964dad5", verifier)
+        self.assertIn("refs/tags/v2.4.0", verifier)
+        self.assertIn("**", ignore)
+        self.assertIn("!src/**", ignore)
 
 
 if __name__ == "__main__":

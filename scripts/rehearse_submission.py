@@ -26,6 +26,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--track2-root", type=Path, required=True)
     parser.add_argument("--image", default="off-the-tape:candidate")
+    parser.add_argument("--verifier-image", default="off-the-tape:verifier")
     parser.add_argument("--output-root", type=Path, default=Path("reports/docker_rehearsal"))
     parser.add_argument("--all", action="store_true")
     parser.add_argument("--skip-build", action="store_true")
@@ -34,7 +35,10 @@ def main() -> int:
         parser.error("docker is not installed or not on PATH")
     output_root = args.output_root if args.output_root.is_absolute() else Path.cwd() / args.output_root
     if not args.skip_build:
-        run(["docker", "build", "--tag", args.image, "."])
+        run(["docker", "build", "--platform", "linux/amd64", "--tag", args.image, "."])
+        run(["docker", "build", "--platform", "linux/amd64", "--build-arg",
+             f"RUNTIME_IMAGE={args.image}", "--file", "Dockerfile.verifier",
+             "--tag", args.verifier_image, "."])
     units = sorted(path for path in (args.track2_root / "units").iterdir()
                    if (path / "card.toml").is_file()) if args.all else [
         args.track2_root / "units" / name for name in REPRESENTATIVES
@@ -60,7 +64,7 @@ def main() -> int:
         run(["docker", "run", "--rm", "--network=none",
              "--mount", f"type=bind,src={unit.resolve()},dst=/input,readonly",
              "--mount", f"type=bind,src={output},dst=/output,readonly",
-             args.image, "qfbench2-smoke", "/input", "/output", "--track", "forecasting"])
+             args.verifier_image, "qfbench2-smoke", "/input", "/output", "--track", "forecasting"])
         records.append({"unit_id": unit.name, "runtime_seconds": time.perf_counter() - started,
                         "outputs": sorted(path.name for path in output.iterdir())})
         print(f"PASS {unit.name} {records[-1]['runtime_seconds']:.2f}s")

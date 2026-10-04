@@ -1,0 +1,10 @@
+ARG RUNTIME_IMAGE=off-the-tape:candidate
+FROM ${RUNTIME_IMAGE}
+
+# Rehearsal-only image: keep the published scorer out of the submitted image.
+USER root
+RUN pip install --no-cache-dir --no-compile \
+      jsonschema==4.23.0 \
+      "qfbench2-common @ https://github.com/Agenthon-2026/Agenthon2026-public/archive/refs/tags/v2.4.0.tar.gz#subdirectory=common" \
+      "qfbench2-track-forecasting @ https://github.com/Agenthon-2026/track2-forecasting-public/archive/83c6dc036bec03862b78e093bf8804d98964dad5.tar.gz"
+USER runner

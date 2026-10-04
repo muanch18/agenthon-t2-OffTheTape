@@ -26,15 +26,16 @@ available only through explicit `--text-conditioned` research mode.
 | Families | F1–F4 | parsed and preserved; production candidate does not condition |
 | Network | restricted; only `MODEL_ENDPOINT`/`MODEL_NAME`; local smoke is none | numeric default makes no calls; `QFBENCH_NETWORK=none` disables endpoint; urllib honors proxy environment |
 | Model budget | 1M input / 100k output tokens per unit | zero in candidate; optional text uses one bounded request and 18k-character selection budget |
-| Image | Python 3.13; label `qfbench2.interface_version="2.0"` | Dockerfile uses Python 3.13 and declares interface, track, and verb labels |
-| Pins | current toolkit and Track 2 scorer | toolkit `v2.4.0` (metadata 2.3.1), Track 2 3.1.0 at audited commit, exact numeric libraries |
+| Image | Python 3.13; label `qfbench2.interface_version="2.0"` | Runtime Dockerfile uses Python 3.13 and declares interface, track, and verb labels |
+| Pins | exact production libraries; scorer for rehearsal | Runtime pins NumPy, pandas, and PyArrow; separate verifier pins toolkit `v2.4.0` and Track 2 3.1.0 at audited commit |
 
 ## Discrepancies corrected
 
 - The earlier CLI conditioned on text by default even though held-out evidence
   favored numeric-only. The frozen default now follows the supported result.
-- Dependency ranges allowed drift. Runtime dependencies and source revisions
-  are now pinned in `pyproject.toml` and `Dockerfile`.
+- Dependency ranges allowed drift. Runtime libraries are pinned in the
+  Dockerfile; the historical-evaluation dependencies are pinned in
+  `pyproject.toml`, and the official scorer is isolated in Dockerfile.verifier.
 - The agent previously propagated PCA/numerical failures. It now uses a joint
   empirical fallback with a volatility floor and deterministic component seeds.
 - Output checks previously relied mostly on the scorer. The agent now checks
