@@ -7,3 +7,6 @@ __pycache__/
 *.parquet
 reports/
 tests/tmp*/
+submission.json
+submission.zip
+team-claim.json

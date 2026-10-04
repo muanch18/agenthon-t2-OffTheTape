@@ -1,0 +1,9 @@
+ARG RUNTIME_IMAGE=off-the-tape:candidate
+FROM ${RUNTIME_IMAGE}
+
+# Local packaging helper only. This image is never submitted.
+USER root
+RUN pip install --no-cache-dir --no-compile \
+      "qfbench2-common @ https://github.com/Agenthon-2026/Agenthon2026-public/archive/refs/tags/v2.4.4.tar.gz#subdirectory=common"
+USER runner
+WORKDIR /workspace

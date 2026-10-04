@@ -229,18 +229,74 @@ This records per-unit gates, runtime stages, fallbacks, calls, and token counts.
 On Windows it calls the Track 2 scorer's official g0–g3 functions directly,
 because the shared smoke wrapper requires POSIX no-follow directory flags.
 
-The submission [`Dockerfile`](Dockerfile) uses Python 3.13, exact dependency
-pins, a non-root user, no runtime installation, and the required
-`qfbench2.interface_version="2.0"` label. On a Linux host with Docker, run the
-representative network-isolated rehearsal, or append `--all`:
+The submission [`Dockerfile`](Dockerfile) uses Python 3.13, exact runtime
+dependency pins, a non-root user, no runtime installation, and the required
+`qfbench2.interface_version="2.0"` label. The official scorer is installed
+only in [`Dockerfile.verifier`](Dockerfile.verifier), keeping it out of the
+submitted image. The public Git repository holds Parquet panels at each unit's
+root, while the evaluator mounts them under `panels/`. Stage the public units
+from committed Git bytes, which also preserves their manifest checksums on
+Windows, then run the network-isolated rehearsal:
 
 ```powershell
-python scripts\rehearse_submission.py --track2-root "$Track2"
+python scripts\stage_public_units.py --public-repo "$Track2" --out .cache\staged-public
+python scripts\rehearse_submission.py --track2-root .cache\staged-public --all
 ```
 
-The rehearsal runs both the agent and the official `qfbench2-smoke` wrapper in
-Linux containers with `--network=none`. Use `--skip-build` to reuse an image
-that has already been built with the selected `--image` tag.
+The rehearsal runs the agent and official `qfbench2-smoke` wrapper in separate
+Linux containers with `--network=none`. Use `--skip-build` only when both
+images already exist. Use a new staging directory for each run. The complete
+new-image result is in [the rehearsal record](docs/new_image_rehearsal.md).
+
+## Submission packaging
+
+The current [submission contract](https://github.com/Agenthon-2026/track2-forecasting-public/blob/main/SUBMISSION_CLI.md)
+requires an anonymously pullable `linux/amd64` image by immutable registry
+digest. Build, rehearse, and push the **runtime** image; the verifier image is
+local only. Confirm the registry package is public and test an anonymous pull.
+Build for the required architecture and push to your own public registry:
+
+```powershell
+docker buildx build --platform linux/amd64 --push -t ghcr.io/ORG/IMAGE:TAG .
+```
+
+Record the immutable registry digest from the push result. Then install the
+[submission toolkit](https://github.com/Agenthon-2026/Agenthon2026-public/blob/v2.4.4/starter-packs/track2/SUBMISSION-DESCRIPTOR.md)
+at version 2.4.4 on the host and run:
+
+```powershell
+python scripts\package_submission.py --image ghcr.io/ORG/IMAGE@sha256:DIGEST --team-number N --license YOUR_SPDX_LICENSE
+```
+
+On Windows when Python 3.13 is unavailable on `PATH`, build the local packager
+container instead and run the same script through it. The bind mount lets the
+toolkit write `submission.zip` into this repository:
+
+```powershell
+docker build --file Dockerfile.packager --build-arg RUNTIME_IMAGE=off-the-tape:candidate --tag off-the-tape:packager .
+docker run --rm -it --mount "type=bind,src=$((Get-Location).Path),dst=/workspace" off-the-tape:packager python scripts/package_submission.py --image ghcr.io/ORG/IMAGE@sha256:DIGEST --team-number N --license YOUR_SPDX_LICENSE
+```
+
+Use your actual image digest, team number, and code license. The script copies
+the official Track 2 descriptor fixture, declares the numeric-only candidate
+with `models: []`, and invokes the toolkit's `submission pack`. The toolkit
+prompts privately for the Team Key and writes `submission.zip` with only
+`submission.json` and `team-claim.json`. Neither file is tracked in Git.
+Packaging does not upload the zip or consume a submission attempt.
+The MIT-licensed runtime image was pushed to Docker Hub as
+`docker.io/anushm22/off-the-tape@sha256:99a9fe62fdf906b6627a1f8fcec0d5b42ddc627abec3edc26c63e4f4df7abc2e`
+on 2026-09-30. It is `linux/amd64`, 495,782,725 bytes (495.8 MB), and an
+unauthenticated manifest lookup succeeded. Use this exact digest for Team 404's
+Development submission. The local packager command is:
+
+```powershell
+docker run --rm -it --mount "type=bind,src=$((Get-Location).Path),dst=/workspace" off-the-tape:packager python scripts/package_submission.py --image docker.io/anushm22/off-the-tape@sha256:99a9fe62fdf906b6627a1f8fcec0d5b42ddc627abec3edc26c63e4f4df7abc2e --team-number 404 --license MIT
+```
+
+The prior combined image measured 755.5 MB.
+All 104 public units produced the required three files under `--network=none`
+and passed `qfbench2-smoke` in the verifier image. The earlier
+`reports/submission_readiness.md` describes the prior combined image.
 
 Run tests with `python -m pytest` after installing dependencies. The in-memory
 unit tests can also run with `python -m unittest discover -s tests`.
