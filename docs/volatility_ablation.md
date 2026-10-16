@@ -50,3 +50,56 @@ do not fully account for serial regime dependence or multiple comparisons.
 Repeated work on the same validation period is exploratory; only the still
 untouched holdout can provide a fresh final comparison after candidate freeze.
 Production settings and the Docker submission remain unchanged by this test.
+
+## Results (2026-10-16)
+
+Completed 917 cases, three seeds, two models and four rules: 22,008 evaluations.
+Three new tests passed, covering exact controls, fixed transformed-space
+locations/correlations, positive FX levels, and response to a synthetic
+pre-cutoff volatility regime. All 5,502 current-rule scores exactly matched
+the preceding PCA/Gaussian experiment (maximum difference zero). No holdout
+cases were scored.
+
+| Model | Rule | Training | Validation |
+|---|---|---:|---:|
+| PCA | Current | 1.001153 | 1.051194 |
+| PCA | Recent 60 | 0.975833 | 1.035643 |
+| PCA | 50/50 current/recent variance | 0.977196 | 1.034442 |
+| PCA | 50/50 current/EWMA variance | **0.975669** | 1.040901 |
+| Gaussian | Current | 1.007362 | 1.042826 |
+| Gaussian | Recent 60 | **0.983055** | 1.025795 |
+| Gaussian | 50/50 current/recent variance | 0.987249 | 1.029814 |
+| Gaussian | 50/50 current/EWMA variance | 0.985513 | 1.034723 |
+
+Bold identifies the training-selected rule, not a choice made on validation.
+PCA selected the current/EWMA blend; Gaussian selected recent-60 volatility.
+
+| Training-selected candidate | Validation change vs current | Relative improvement | Exploratory 95% origin interval |
+|---|---:|---:|---|
+| PCA current/EWMA blend | -0.010293 | 0.98% | [-0.026753, +0.007687] |
+| Gaussian recent 60 | -0.017030 | 1.63% | [-0.042718, +0.008980] |
+
+Both selected rules improve validation at all three seeds. Gaussian recent-60
+improves the point estimate in all five shapes; PCA's selected blend improves
+four shapes and slightly worsens single rates (+0.003250). Every selected
+per-shape validation interval still includes zero. All three noncurrent rules
+improve the overall validation point estimate for both models, but all overall
+validation intervals also include zero.
+
+The PCA current/recent blend happens to look better on validation than the
+training-selected EWMA blend. Switching to it now would be an additional
+selection on validation. Do not treat that alternative as independently
+confirmed or change the rule to maximize the displayed validation result.
+
+Decision: retain the frozen production submission for now, but keep these
+two training-selected volatility rules as the strongest candidates from this
+research sequence. Unlike drift and cross-panel dependence, the improvement
+is larger in score terms and consistent across seeds, although
+generalization remains unconfirmed. Freeze candidate definitions and the
+holdout evaluation protocol before inspecting the untouched 2022–2024 cases.
+Do not retune after reading holdout results.
+
+Implementation and tests were pushed in commit `60dcd8c` on
+`codex/final-validation-experiments`. This findings record is committed
+separately. Detailed generated JSON stays local under the existing `reports/`
+ignore rule; code, methods, tests and these findings are tracked in Git.
