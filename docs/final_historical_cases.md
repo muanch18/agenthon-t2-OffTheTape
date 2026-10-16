@@ -57,3 +57,11 @@ an exact origin observation, 69 lacked an exact target, and two crossed a split
 boundary. No cases were excluded based on move size or direction. The manifest
 retains every exclusion and source file hash. No holdout model scores have been
 computed. Two new regression tests and 14 existing historical tests passed.
+
+## Holdout state after 2026-10-16 evaluation
+
+The fixed 156 holdout cases were subsequently evaluated under the separately
+committed protocol `9113289`. This holdout is now consumed and must not be
+described as untouched in future research. See `frozen_holdout_results.md` for
+the frozen comparisons, findings and limitations. The original roster was not
+changed and the results were not used to retune candidate definitions.

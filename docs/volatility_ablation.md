@@ -103,3 +103,11 @@ Implementation and tests were pushed in commit `60dcd8c` on
 `codex/final-validation-experiments`. This findings record is committed
 separately. Detailed generated JSON stays local under the existing `reports/`
 ignore rule; code, methods, tests and these findings are tracked in Git.
+
+## Subsequent frozen confirmation
+
+The two training-selected rules were later frozen in commit `9113289` and
+evaluated on the previously untouched 2022–2024 roster. See
+`frozen_holdout_results.md`. PCA's blend passed the predeclared criterion;
+Gaussian's recent-60 improvement was not confirmed by its adjusted interval.
+That holdout is now consumed. No volatility settings were retuned afterward.
