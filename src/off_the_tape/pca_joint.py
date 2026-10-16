@@ -42,7 +42,7 @@ class PCAJointForecaster:
     def __call__(self, card: PseudoCard) -> np.ndarray:
         return self.forecast(card).draws
 
-    def forecast(self, card: PseudoCard) -> PCAForecast:
+    def forecast(self, card: PseudoCard, *, block_starts: np.ndarray | None = None) -> PCAForecast:
         started = perf_counter()
         if self.mode == "simple_return" and card.target_type != "log_return":
             raise ValueError("simple_return mode requires a log_return target")
@@ -108,7 +108,14 @@ class PCAJointForecaster:
         block = min(self.block_size, len(innovations))
         n_blocks = (horizon + block - 1) // block
         rng = np.random.default_rng(self.seed + card.asof.toordinal())
-        starts = rng.integers(0, len(innovations) - block + 1, size=(self.n_draws, n_blocks))
+        if block_starts is None:
+            starts = rng.integers(0, len(innovations) - block + 1, size=(self.n_draws, n_blocks))
+        else:
+            starts = np.asarray(block_starts)
+            if (starts.shape != (self.n_draws, n_blocks)
+                    or not np.issubdtype(starts.dtype, np.integer)
+                    or np.any(starts < 0) or np.any(starts > len(innovations) - block)):
+                raise ValueError("invalid historical innovation block starts")
         indices = (starts[:, :, None] + np.arange(block)).reshape(self.n_draws, -1)[:, :horizon]
         sampled = innovations[indices]
 
