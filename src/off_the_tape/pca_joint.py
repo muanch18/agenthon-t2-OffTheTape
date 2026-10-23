@@ -14,6 +14,7 @@ import numpy as np
 
 from .bootstrap import ChangeMode
 from .historical import PseudoCard
+from .features import FeatureLayer
 
 
 @dataclass(frozen=True)
@@ -42,33 +43,19 @@ class PCAJointForecaster:
     def __call__(self, card: PseudoCard) -> np.ndarray:
         return self.forecast(card).draws
 
-    def forecast(self, card: PseudoCard, *, block_starts: np.ndarray | None = None) -> PCAForecast:
+    def forecast(self, card: PseudoCard, *, block_starts: np.ndarray | None = None,
+                 features: FeatureLayer | None = None) -> PCAForecast:
         started = perf_counter()
         if self.mode == "simple_return" and card.target_type != "log_return":
             raise ValueError("simple_return mode requires a log_return target")
         if self.mode != "simple_return" and card.target_type != "level":
             raise ValueError("level targets require difference or log_price mode")
-        if card.panel.empty or card.panel["date"].max().date() > card.asof:
-            raise ValueError("forecast panel must be nonempty and end on or before as-of")
-
-        wide = card.panel.pivot(index="date", columns="asset", values="value")
-        wide = wide.loc[:, list(card.assets)].sort_index()
-        values = wide.to_numpy(dtype=float)
-        if not np.isfinite(values).all():
-            raise ValueError("training panel must be complete and finite")
-        if self.mode == "difference":
-            transformed = np.diff(values, axis=0)
-            transformed_dates = wide.index[1:]
-        elif self.mode == "log_price":
-            if np.any(values <= 0):
-                raise ValueError("log_price mode requires positive levels")
-            transformed = np.diff(np.log(values), axis=0)
-            transformed_dates = wide.index[1:]
-        else:
-            if np.any(values <= -1):
-                raise ValueError("simple_return mode requires daily returns above -1")
-            transformed = np.log1p(values)
-            transformed_dates = wide.index
+        if features is None:
+            features = FeatureLayer(card.panel, assets=card.assets, asof=card.asof)
+        elif not features.matches(card.panel, card.assets, card.asof):
+            raise ValueError("prepared features do not match forecast inputs")
+        history = features.history(self.mode)
+        values, transformed, transformed_dates = history.values, history.changes, history.dates
 
         training = transformed[-self.lookback :]
         if len(training) < max(20, self.n_factors + 3):

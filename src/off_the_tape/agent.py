@@ -25,6 +25,7 @@ from .pca_joint import PCAJointForecaster
 from .output_validation import validate_draw_matrix, validate_forecast_frame
 from .safe_forecast import safe_joint_paths
 from .seeds import SeedManager
+from .features import FeatureLayer
 
 
 @dataclass(frozen=True)
@@ -189,20 +190,10 @@ class Track2Agent:
             if match is None:
                 raise ValueError(f"missing panel {panel_id}")
             frame = pd.read_parquet(match)
-            if "asset_id" in frame.columns and "asset" not in frame.columns:
-                frame = frame.rename(columns={"asset_id": "asset"})
-            if not {"date", "asset", "value"}.issubset(frame.columns):
-                raise ValueError("panel needs date, asset, value")
-            frame = frame.copy()
-            frame["date"] = pd.to_datetime(frame["date"])
-            frame["value"] = pd.to_numeric(frame["value"], errors="coerce")
-            if (frame["date"] > pd.Timestamp(task.asof)).any():
-                frame = frame.loc[frame["date"] <= pd.Timestamp(task.asof)].copy()
             group_assets = tuple(a for a in task.assets if task.asset_panels[a] == panel_id)
-            frame = frame.loc[frame["asset"].isin(group_assets), ["date", "asset", "value"]]
-            frame = frame.sort_values(["date", "asset"]).drop_duplicates(["date", "asset"], keep="last")
-            if frame.empty or set(frame["asset"]) != set(group_assets):
-                raise ValueError("target asset absent from panel")
+            features = FeatureLayer(frame, assets=group_assets, asof=task.asof,
+                                    future_policy="filter", duplicate_policy="last")
+            frame = features.frame
             full_frame.append(frame)
             mode = "simple_return" if task.target_type == "log_return" else (
                 "log_price" if "fx" in panel_id.lower() else "difference"
@@ -211,12 +202,12 @@ class Track2Agent:
                 task.family, panel_id, task.asof, frame, group_assets, task.horizons,
                 task.target_type, tuple((pd.Timestamp(task.asof) + pd.offsets.BDay(h)).date() for h in task.horizons),
             )
-            wide = frame.pivot(index="date", columns="asset", values="value").sort_index()
+            wide = features.wide
             try:
                 fit = PCAJointForecaster(
                     mode=mode, n_draws=self.n_draws,
                     seed=seeds.derive(f"pca:{panel_id}"),
-                ).forecast(local_card)
+                ).forecast(local_card, features=features)
                 group_paths = fit.paths
                 group_context = NumericContext(
                     tuple(mode for _ in group_assets),
