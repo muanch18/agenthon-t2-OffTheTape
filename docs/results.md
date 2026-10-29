@@ -67,6 +67,15 @@ does not isolate PCA's value. It was performed after inspecting the holdout.
 
 ## Other experiments and decisions
 
+The subsequent [shared-input study](controlled_architecture_results.md) was
+frozen before running 226 previously explored validation cases. It aligned
+preprocessing, window, drift and volatility settings: PCA loss was 1.051194
+versus Gaussian 1.053374, a 0.207% reduction with paired 95% interval
+[-0.015319, +0.009936]. Median warm API latencies were 5.642 ms and 1.316 ms,
+respectively; PCA includes additional diagnostics. There is no clear accuracy
+winner. These exploratory validation scores must remain separate from the
+original frozen-candidate holdout scores.
+
 | Experiment | Evidence | Decision and boundary |
 |---|---|---|
 | Base PCA vs base Gaussian | All per-shape validation intervals cross zero | Keep both; not architecture attribution |

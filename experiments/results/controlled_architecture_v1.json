@@ -1,0 +1,127 @@
+{
+  "protocol_sha256": "17f761e89e97b42878ccaa5d41401b694e4800be72e8d797548093448ded34bb",
+  "exploratory": true,
+  "holdout_scored": false,
+  "official_run": false,
+  "summary": {
+    "cases": 226,
+    "origins": 50,
+    "gaussian": 1.0533735577137824,
+    "pca": 1.0511943143116937,
+    "delta_pca_minus_gaussian": -0.0021792434020886375,
+    "pca_relative_reduction_pct": 0.20688229604115155,
+    "exploratory_ci95": [
+      -0.015319486959905362,
+      0.009936336029615994
+    ],
+    "delta_by_seed": {
+      "2026": -0.002347972166540008,
+      "17": -0.001849134052317466,
+      "83": -0.002340623987408274
+    }
+  },
+  "by_shape": {
+    "fx_basket": {
+      "cases": 44,
+      "origins": 44,
+      "gaussian": 1.0285288063240308,
+      "pca": 1.0269530456752352,
+      "delta_pca_minus_gaussian": -0.00157576064879561,
+      "pca_relative_reduction_pct": 0.15320530053284453,
+      "exploratory_ci95": [
+        -0.025003804939862692,
+        0.01618600807636992
+      ],
+      "delta_by_seed": {
+        "2026": -0.004247509581184463,
+        "17": 2.5920310338542725e-05,
+        "83": -0.0005056926755404337
+      }
+    },
+    "fx_single": {
+      "cases": 47,
+      "origins": 47,
+      "gaussian": 1.1081565860988576,
+      "pca": 1.105875436037502,
+      "delta_pca_minus_gaussian": -0.0022811500613555413,
+      "pca_relative_reduction_pct": 0.20585087793288107,
+      "exploratory_ci95": [
+        -0.03250644005765945,
+        0.016117412300947834
+      ],
+      "delta_by_seed": {
+        "2026": -0.006372684442157639,
+        "17": 0.004422487491686262,
+        "83": -0.004893253233595467
+      }
+    },
+    "mixed": {
+      "cases": 43,
+      "origins": 43,
+      "gaussian": 1.0688601819436703,
+      "pca": 1.0673486716655058,
+      "delta_pca_minus_gaussian": -0.0015115102781644296,
+      "pca_relative_reduction_pct": 0.14141328339276535,
+      "exploratory_ci95": [
+        -0.010821418882751229,
+        0.012462467959896813
+      ],
+      "delta_by_seed": {
+        "2026": -0.0005846855623033507,
+        "17": -0.003285637448406235,
+        "83": -0.0006642078237839874
+      }
+    },
+    "rates_curve": {
+      "cases": 45,
+      "origins": 45,
+      "gaussian": 1.0874482292447758,
+      "pca": 1.0812699926186724,
+      "delta_pca_minus_gaussian": -0.006178236626103395,
+      "pca_relative_reduction_pct": 0.568140759251972,
+      "exploratory_ci95": [
+        -0.03739188046964767,
+        0.02263344892974783
+      ],
+      "delta_by_seed": {
+        "2026": -0.006593881344306518,
+        "17": -0.004955620581037228,
+        "83": -0.006985207952967428
+      }
+    },
+    "rates_single": {
+      "cases": 47,
+      "origins": 47,
+      "gaussian": 0.9750561463578381,
+      "pca": 0.9756317655641026,
+      "delta_pca_minus_gaussian": 0.0005756192062644772,
+      "pca_relative_reduction_pct": -0.059034467749842716,
+      "exploratory_ci95": [
+        -0.015012942907552587,
+        0.015410671149801573
+      ],
+      "delta_by_seed": {
+        "2026": 0.005907042986985555,
+        "17": -0.005587582237441579,
+        "83": 0.0014073968692498275
+      }
+    }
+  },
+  "runtime_seconds": {
+    "gaussian": {
+      "median": 0.0013160009999637623,
+      "p90": 0.0023067294999918886
+    },
+    "pca": {
+      "median": 0.00564185749999524,
+      "p90": 0.00973356400004377
+    }
+  },
+  "runtime_environment": {
+    "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.36",
+    "processor": "",
+    "note": "Warm model API calls; PCA includes diagnostic construction; excludes shared preparation and scoring"
+  },
+  "raw_result_sha256": "1558299da568ebca2975a32233d3750d4d77da3df1e1c6f924dc7f0b0daad337",
+  "raw_result_path": "reports/controlled_architecture_v1.json"
+}

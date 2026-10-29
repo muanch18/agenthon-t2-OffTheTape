@@ -59,6 +59,7 @@ must not be made compatible by rewriting old hashes.
 See [holdout findings](frozen_holdout_results.md),
 [direct comparison](direct_candidate_comparison.md), and
 [shared-input comparison protocol](controlled_architecture_protocol.md).
-The new controlled study uses different, shared settings. Its arms must not
+The [completed controlled study](controlled_architecture_results.md) uses
+different, shared settings. Its arms must not
 be called these original frozen candidates, and its scores cannot be inserted
 into the original holdout table.

@@ -32,6 +32,9 @@ See the [two frozen candidate profiles](docs/frozen_candidates.md) for an
 explicit comparison of assumptions, volatility rules and evidence. A separate
 [shared-input study](docs/controlled_architecture_protocol.md) controls the
 preprocessing differences; it does not redefine the original candidates.
+Its [completed results](docs/controlled_architecture_results.md) show a 0.21%
+PCA validation advantage with an interval crossing zero; Gaussian's measured
+warm API calls were faster, with timing scope documented alongside the result.
 
 The numerical study uses chronological splits: **2005–2017 training (691 cases), 2018–2021 validation (226), and 2022–2024 holdout (156 across 33 origins)**. Each forecast has 1,000 draws and three seeds. The suite covers single yields, yield curves, single FX, FX baskets and mixed rates/FX at 2–12 weekday horizons. Seeds measure Monte Carlo sensitivity; they are not independent market samples.
 
@@ -47,6 +50,7 @@ Intervals above are the predefined 97.5% moving-block bootstrap intervals, adjus
 | Other experiment | Finding | Decision |
 |---|---|---|
 | Direct adjusted Gaussian vs adjusted PCA | Gaussian mean loss 2.02% lower; 95% paired interval [-0.07753, +0.01326] | Exploratory; no overall winner |
+| Shared-input PCA vs Gaussian | PCA validation loss 0.21% lower; 95% paired interval [-0.01532, +0.00994] | Exploratory; no clear accuracy advantage |
 | Historical drift shrinkage | Training-selected zero drift failed to improve validation | Retain full drift |
 | Rates/FX dependence adjustments | Negligible validation effects relative to sampling variation | Do not enable tested adjustments |
 | Band-SETAR factor dynamics | Validation loss increased 0.134% | Retain AR(1) dynamics |
@@ -75,13 +79,13 @@ For real panels, agent CLI usage, evaluation dependencies and Docker commands, s
 - **LLM integration:** dated document selection, bounded prompt context, structured macro extraction, citation-ID validation, caching and neutral fallback. This is a fixed workflow; no fine-tuning or vector search is claimed.
 - **Deployment:** pinned dependencies, a non-root Linux runtime image, output validation and network-isolated public-unit rehearsal.
 
-Recorded verification includes 104/104 official public-unit gate passes before a license-only image rebuild, a worked-exemplar pass on that published image, and 104/104 forecast/fallback parity checks after the feature refactor. The consolidated source suite passed **70 tests**. These checks establish correctness and contract behavior, not forecasting superiority. Details: [container rehearsal](docs/new_image_rehearsal.md), [feature parity](docs/shared_feature_layer.md).
+Recorded verification includes 104/104 official public-unit gate passes before a license-only image rebuild, a worked-exemplar pass on that published image, and 104/104 forecast/fallback parity checks after the feature refactor. The source suite passed **73 tests** after the shared-input study. These checks establish correctness and contract behavior, not forecasting superiority. Details: [container rehearsal](docs/new_image_rehearsal.md), [feature parity](docs/shared_feature_layer.md).
 
 ## Limits and next steps
 
 The project does not establish official Final performance, trading profitability, or live-market generalization. The historical suite has only 33 holdout origins, uses weekday target dates with missing-date exclusions, and cannot prove point-in-time vintage availability from cutoff filtering alone. Repeated validation work is exploratory. The text experiment used a lexical proxy; it is not an LLM-quality benchmark.
 
-The source includes the shared feature refactor, but the archived Docker image predates it. Adaptive volatility is a research candidate and SETAR remains an isolated experiment. A controlled architecture study and an actual LLM extraction benchmark are possible extensions; neither is presented as completed.
+The source includes the shared feature refactor, but the archived Docker image predates it. Adaptive volatility is a research candidate and SETAR remains an isolated experiment. The shared-input numerical comparison is complete; a component-by-component architecture study and an actual LLM extraction benchmark remain possible extensions.
 
 ## Repository map
 
