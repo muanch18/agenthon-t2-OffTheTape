@@ -1,331 +1,91 @@
-# Off The Tape: historical Track 2 evaluation
+# Off The Tape
 
-## Research extensions on main
+**Joint probabilistic forecasting for Treasury yields and FX, with reproducible model evaluation and an optional LLM evidence pipeline.**
 
-The completed research extensions are consolidated here:
+Built for Agenthon 2026 Track 2 and extended into a quantitative research project. The system produces 1,000 scenarios across assets and forecast horizons. The research asks which modeling choices improve those distributions—and whether their added complexity is justified.
 
-- [Historical case construction](docs/final_historical_cases.md),
-  [PCA/Gaussian comparison](docs/gaussian_comparison.md), and controlled
-  [drift](docs/drift_ablation.md), [cross-panel dependence](docs/cross_panel_ablation.md),
-  and [volatility](docs/volatility_ablation.md) experiments.
-- [Frozen holdout protocol](docs/frozen_holdout_protocol.md) and
-  [results](docs/frozen_holdout_results.md): PCA's adaptive-volatility candidate
-  reduced local historical holdout loss by 3.88% against its own control and
-  passed the predeclared criterion. The holdout is now consumed.
-- [Exploratory direct candidate comparison](docs/direct_candidate_comparison.md):
-  Gaussian's mean loss was 2.02% lower than PCA's, but the paired interval
-  crossed zero. No overall model winner was established.
-- [Band-SETAR extension](docs/setar_ablation.md): the tested nonlinear factor
-  dynamics did not improve validation; retained as research, not enabled.
-- [Shared numeric feature layer](docs/shared_feature_layer.md): cutoff-aware
-  snapshots, alignment, transformations and volatility calculations are
-  implemented and connected to PCA. Recorded public-unit forecast/fallback
-  parity was 104/104 after the refactor.
+The strongest finding was a **3.88% reduction in historical holdout loss** from an adaptive-volatility adjustment to PCA, relative to unchanged PCA. A simpler Gaussian alternative remained competitive: its adjusted candidate had 2.02% lower mean loss than adjusted PCA, but the direct comparison did not establish an overall winner. These are local research results, not competition rankings.
 
-Research candidates and the published Docker image are distinct artifacts.
-The volatility candidate and SETAR experiment are not enabled in the production
-configuration. Historical freeze hashes remain unchanged: reproduce those
-experiments at their recorded commits, rather than rewriting their protocols
-to accept later refactors. These are local research findings, not official
-competition results.
+## Architecture
 
-This repository currently provides a local historical evaluation harness. It creates
-pseudo-cards from a full historical panel, passes only observations through each
-as-of date to a forecasting callback, constructs later outcomes, and scores saved
-joint draws. A deliberately simple numeric baseline samples whole historical
-cross-asset change rows and produces 1,000 joint scenarios. A separate text
-research pipeline extracts macro state; it does not alter either numeric model.
+```mermaid
+flowchart TD
+    A[Task card and dated numeric panels] --> B[Parse assets, horizons and cutoff]
+    B --> C[Shared numeric feature layer]
+    C --> D[PCA factors and AR dynamics]
+    D --> E[Joint paths from historical innovation blocks]
+    E --> F[Read requested horizons]
+    F --> G[Validate forecast grid and values]
+    G --> H[Parquet scenarios, metadata and rationale]
+    E -. Optional text-conditioned run .-> J[Bounded macro conditioner]
+    T[Dated document corpus] -.-> U[Cutoff filter and ranked excerpts]
+    U -.-> V[LLM extraction with schema and citation checks]
+    V -.-> J
+    J -.-> G
+```
 
-The input panel must be long-format Parquet with `date`, `asset`, and `value`
-columns, as in the [Track 2 public repository](https://github.com/Agenthon-2026/track2-forecasting-public).
-An optional `panel_id` column is checked against the requested panel ID. The public practice units contain
-cutoff panels but **no answer keys**, so this harness needs a separate full
-historical panel for retrospective runs. It does not reconstruct or publish
-official sealed outcomes. Keep local reports and full panels out of Git.
+The default command follows the numeric path and makes no LLM call. PCA fits each numeric panel separately; mixed rates/FX paths do not learn cross-panel covariance by default. Invalid numeric output triggers an empirical fallback; unavailable or invalid text yields a neutral state. Research volatility variants and the Gaussian comparator run in the evaluation workflow, rather than being enabled by the production command. See [architecture and boundaries](docs/architecture.md).
 
-Use Python 3.13 or newer. Install the shared toolkit at the public repository's
-documented tag, then the Track 2 scorer and this package:
+## Results
+
+The numerical study uses chronological splits: **2005–2017 training (691 cases), 2018–2021 validation (226), and 2022–2024 holdout (156 across 33 origins)**. Each forecast has 1,000 draws and three seeds. The suite covers single yields, yield curves, single FX, FX baskets and mixed rates/FX at 2–12 weekday horizons. Seeds measure Monte Carlo sensitivity; they are not independent market samples.
+
+Loss combines marginal CRPS, joint variogram and tail pinball terms with locally reconstructed expected-error normalization. **Lower is better.**
+
+| Frozen holdout comparison | Control loss | Candidate loss | Relative reduction | Candidate minus control interval | Interpretation |
+|---|---:|---:|---:|---|---|
+| PCA + 50/50 historical/EWMA variance | 1.35788 | 1.30518 | **3.88%** | [-0.12458, -0.00139] | Passed predefined criterion |
+| Gaussian + recent-60 volatility | 1.33251 | 1.27886 | 4.03% | [-0.14703, +0.00310] | Not confirmed |
+
+Intervals above are the predefined 97.5% moving-block bootstrap intervals, adjusted for two comparisons. Each row compares a candidate against its own unchanged model. They do not test PCA against Gaussian.
+
+| Other experiment | Finding | Decision |
+|---|---|---|
+| Direct adjusted Gaussian vs adjusted PCA | Gaussian mean loss 2.02% lower; 95% paired interval [-0.07753, +0.01326] | Exploratory; no overall winner |
+| Historical drift shrinkage | Training-selected zero drift failed to improve validation | Retain full drift |
+| Rates/FX dependence adjustments | Negligible validation effects relative to sampling variation | Do not enable tested adjustments |
+| Band-SETAR factor dynamics | Validation loss increased 0.134% | Retain AR(1) dynamics |
+| Text-conditioned pipeline | Offline lexical proxy did not justify enabling conditioning | Numeric default; LLM uplift unestablished |
+
+PCA's volatility gain was concentrated in 2022; the candidate slightly worsened 2024 loss. The holdout is now consumed. See [results, uncertainty and decisions](docs/results.md) for year breakdowns, experiment provenance and the distinction between research candidates and the published image.
+
+## Try it without market data or API credentials
+
+Use Python 3.13 or newer, from the repository root:
 
 ```powershell
-python -m pip install "qfbench2-common[data] @ git+https://github.com/Agenthon-2026/Agenthon2026-public.git@v2.4.0#subdirectory=common"
-python -m pip install "qfbench2-track-forecasting @ git+https://github.com/Agenthon-2026/track2-forecasting-public.git@83c6dc036bec03862b78e093bf8804d98964dad5"
-python -m pip install -e ".[test]"
+python -m pip install -e .
+python -m experiments.synthetic_demo
 ```
 
-To score forecasts already saved for a historical panel:
+The example creates correlated synthetic yield histories, reuses the feature layer in PCA, and runs the base PCA and Gaussian models on the same card. It prints joint scenario shapes and quantiles and writes `reports/synthetic_demo.json`. It needs no scorer, network access, credentials, or downloaded dataset after installation. Synthetic output demonstrates the API; it is not evidence of forecasting accuracy and does not apply research volatility adjustments. Both models receive only observations through the cutoff.
 
-```powershell
-off-the-tape-backtest --panel C:\data\rates_daily.parquet `
-  --panel-id rates_daily --family T2-F3 `
-  --forecasts C:\data\historical_draws --assets UST_2Y UST_10Y `
-  --horizons 21 63 --target-type level `
-  --origins 2018-01-31 2018-04-30 --output reports\rates.json
-```
+For real panels, agent CLI usage, evaluation dependencies and Docker commands, see the [technical guide](docs/technical_guide.md). Exact historical research runs use the commits and hashes recorded in their protocols; current refactors must not be substituted by rewriting those hashes.
 
-For each origin, provide `<forecasts>/<YYYY-MM-DD>.parquet` with exactly
-`draw`, `asset`, `horizon`, and `value` columns. Draw IDs start at zero and
-identify complete joint scenarios across the asset/horizon grid. At least 200
-draws are required. The same source panel can be used programmatically:
+## Engineering and AI work
 
-```python
-from off_the_tape.historical import evaluate, historical_cases
+- **Shared features:** cutoff-aware snapshots, explicit duplicate policies, ordered panel alignment, level/log/return transforms, and historical/recent/EWMA volatility. Immutable outputs and per-snapshot caching support reuse.
+- **Forecasting:** coherent scenarios across horizons, PCA/AR(1) with empirical block shocks, a Gaussian benchmark, and an empirical fallback.
+- **Evaluation:** outcome-separated historical cards, paired ablations, fixed candidate definitions, hashed inputs, and origin-block uncertainty estimates.
+- **LLM integration:** dated document selection, bounded prompt context, structured macro extraction, citation-ID validation, caching and neutral fallback. This is a fixed workflow; no fine-tuning or vector search is claimed.
+- **Deployment:** pinned dependencies, a non-root Linux runtime image, output validation and network-isolated public-unit rehearsal.
 
-cases = historical_cases(panel, family="T2-F3", panel_id="rates_daily",
-                         assets=["UST_2Y", "UST_10Y"],
-                         horizons=[21], target_type="level",
-                         origins=["2018-01-31"])
-from off_the_tape.bootstrap import JointRowBootstrap
-results = evaluate(cases, JointRowBootstrap(mode="difference"))
-```
+Recorded verification includes 104/104 official public-unit gate passes before a license-only image rebuild, a worked-exemplar pass on that published image, and 104/104 forecast/fallback parity checks after the feature refactor. The consolidated source suite passed **70 tests**. These checks establish correctness and contract behavior, not forecasting superiority. Details: [container rehearsal](docs/new_image_rehearsal.md), [feature parity](docs/shared_feature_layer.md).
 
-`make_joint_draws` receives a `PseudoCard` containing only history through
-`card.asof`, and returns a NumPy matrix with shape `(n_draws,
-len(card.assets) * len(card.horizons))`. Columns follow asset-major,
-horizon-minor order. A horizon uses the exact weekday date `asof + BDay(h)`;
-if that date is absent from the panel, the case fails rather than shifting its
-target. For `level`, the outcome is the value on that target date. For
-`log_return`, panel values are daily simple returns; the outcome is the sum of
-`log(1 + r)` over available observations after as-of through the target date.
-All requested assets must be present on every panel date. Missing or incomplete
-origins fail instead of being silently excluded.
+## Limits and next steps
 
-The bootstrap has three modes: `difference` adds resampled daily level changes
-(suited to UST yields), `log_price` compounds resampled log-price changes
-(suited to positive FX rates), and `simple_return` sums `log(1+r)` from daily
-simple-return panels. Each simulated day samples one **joint** historical row,
-preserving contemporaneous cross-asset dependence. The default lookback is 504
-observations. Its random seed is fixed per as-of date for reproducibility; the
-method does not model serial dependence, regimes, or text.
+The project does not establish official Final performance, trading profitability, or live-market generalization. The historical suite has only 33 holdout origins, uses weekday target dates with missing-date exclusions, and cannot prove point-in-time vintage availability from cutoff filtering alone. Repeated validation work is exploratory. The text experiment used a lexical proxy; it is not an LLM-quality benchmark.
 
-The stronger numeric candidate is `PCAJointForecaster` in
-[`src/off_the_tape/pca_joint.py`](src/off_the_tape/pca_joint.py). It transforms
-rates to daily changes, FX levels to daily log returns, and factor daily simple
-returns to `log(1+r)` for cumulative-log-return targets. On the last 504
-pre-as-of observations it standardizes each series, decomposes the joint panel
-as `X_t = B f_t + e_t`, fits a clipped AR(1) to each factor, and resamples
-paired factor innovations and residuals in five-day blocks. It then simulates
-the full path once per draw and reads every requested horizon from that same
-path. The empirical shocks retain observed extremes; they do not extrapolate
-beyond the historical shock pool.
+The source includes the shared feature refactor, but the archived Docker image predates it. Adaptive volatility is a research candidate and SETAR remains an isolated experiment. A controlled architecture study and an actual LLM extraction benchmark are possible extensions; neither is presented as completed.
 
-```python
-from off_the_tape.pca_joint import PCAJointForecaster
+## Repository map
 
-model = PCAJointForecaster(mode="difference")  # "log_price" for FX
-forecast = model.forecast(cases[0].card)
-draws = forecast.draws                  # [1000, assets * horizons]
-paths = forecast.paths                  # [1000, max_horizon, assets]
-diagnostics = forecast.diagnostics
-```
+| Location | Contents |
+|---|---|
+| [`src/off_the_tape/`](src/off_the_tape/) | Features, numerical models, agent, text pipeline and validators |
+| [`experiments/`](experiments/) | Comparisons, ablations, frozen protocol and tracked audit summaries |
+| [`tests/`](tests/) | Behavioral, parity, cutoff, inference and evaluation checks |
+| [`scripts/`](scripts/) | Public-unit staging, rehearsal and packaging |
+| [`docs/`](docs/) | Methods, findings, architecture and technical instructions |
 
-The diagnostics include PCA explained-variance ratios, the standardized
-loading matrix, residual covariance in native daily-change/return units,
-historical and simulated marginal volatility and cross-asset correlation, and
-the 1%, 5%, 95%, and 99% quantiles of each asset/horizon forecast cell.
-
-Run the UST/G10 example after cloning the public Track 2 repository and
-installing this package:
-
-```powershell
-$Track2 = 'C:\path\to\track2-forecasting-public'
-python experiments\bootstrap_backtest.py `
-  --rates-panel "$Track2\units\t2-F1-hawkish-cut-2024\rates_daily.parquet" `
-  --fx-panel "$Track2\units\t2-F3-election-2024-joint\g10_fx_daily.parquet"
-```
-
-It evaluates 21- and 63-business-day forecasts at four historical as-of dates
-for UST 2Y/5Y/10Y/30Y and EUR/GBP/AUD/NZD. The supplied panels contain later
-observations for constructing retrospective outcomes; each forecast still
-receives only its own pre-as-of history. The script prints CRPS, variogram,
-tail pinball loss, and composite score per case.
-
-Compare the bootstrap and PCA candidate on exactly those same pseudo-cards:
-
-```powershell
-python -m experiments.compare_joint_forecasters `
-  --rates-panel "$Track2\units\t2-F1-hawkish-cut-2024\rates_daily.parquet" `
-  --fx-panel "$Track2\units\t2-F3-election-2024-joint\g10_fx_daily.parquet"
-```
-
-It prints mean component scores by panel and model, plus origins where PCA has
-a worse composite. It saves per-origin scores and all PCA diagnostics to
-`reports/pca_joint_diagnostics.json` by default. Both methods use a 504-row
-lookback, 1,000 draws, the same four cutoffs, and the same 21/63-business-day
-grid. Raw means are meaningful within one panel/grid, not between UST and FX.
-
-Reports use the [shared toolkit's CRPS and variogram functions](https://github.com/Agenthon-2026/Agenthon2026-public)
-and the [Track 2 scorer's pinball tail loss](https://github.com/Agenthon-2026/track2-forecasting-public).
-The single-cell score uses the published weight redistribution. Scores are
-**raw and unranked**: official baseline reference scales and sealed outcomes
-are unavailable locally, and raw scores from different panels or units should
-not be compared as leaderboard scores. The summary averages only the cases
-in one invocation.
-
-The text pipeline reads each practice unit's `text/corpus_index.json` and only
-documents whose indexed publication timestamp is on or before the requested
-as-of date. [Corpus inspection notes](docs/text_corpus_notes.md) describe the
-actual file types and sizes. `DocumentSelector` ranks eligible documents by
-recency, source/type, and family/panel keywords, then sends bounded excerpts
-to an OpenAI-style `MODEL_ENDPOINT/chat/completions`. Set `MODEL_NAME` for the
-organizer model. The prompt asks for macro and regime signals only; the strict
-`MacroState` schema and cited document IDs are validated before accepting a
-response. Invalid output or an unavailable endpoint yields a neutral state.
-
-```python
-from datetime import date
-from pathlib import Path
-from off_the_tape.macro_extractor import extract_macro_state, extract_with_prior
-
-unit = Path(r"C:\path\to\track2-forecasting-public\units\t2-F1-cpi-glidepath-2023")
-result = extract_macro_state(unit, asof=date(2023, 7, 12),
-                             family="T2-F1", panel_id="rates_daily")
-comparison = extract_with_prior(unit, asof=date(2023, 7, 12),
-                                window_days=60, family="T2-F1",
-                                panel_id="rates_daily")
-neutral = extract_macro_state(unit, asof=date(2023, 7, 12),
-                              text_enabled=False)
-```
-
-Validated outputs are cached under `.cache/macro_state/` using the full eligible
-corpus content and metadata hashes, as-of date, selected excerpts, model name,
-seed, prompt/schema/selector versions, and selection settings. Thus a changed
-document, even one not selected for the prompt, invalidates the cache. The
-`text_enabled=False` path bypasses document loading and returns neutral state.
-
-To inspect F1–F4 examples locally, run:
-
-```powershell
-python -m experiments.text_state_diagnostics --track2-root "$Track2" --offline-heuristic
-```
-
-The explicit offline heuristic is a lexical **pipeline proxy**, not an LLM
-quality estimate or automatic fallback. With a configured `MODEL_ENDPOINT`,
-omit `--offline-heuristic` to test the model. The script prints period states,
-configurable prior-window deltas, and sanity warnings and writes evidence to
-`reports/text_state_diagnostics.json`. It does not call the forecaster or
-modify forecast distributions.
-
-The first runnable Track 2 agent composes PCA joint numeric paths with a
-bounded, family-aware macro conditioner. The `forecast` entry point parses the
-unit's `card.toml`, loads the exact target assets and horizons, selects dated
-text, and writes `forecast.parquet`, `forecast_meta.json`, and
-`forecast_rationale.md`. Without `MODEL_ENDPOINT`, extraction falls back to a
-neutral state and the numeric forecast remains valid. `--numeric-only` bypasses
-text inference and yields exactly the same base draws at a fixed seed.
-
-```powershell
-forecast --panels "$Track2\units\t2-F3-election-2024-joint\panels" `
-  --text "$Track2\units\t2-F3-election-2024-joint\text" `
-  --asof 2024-10-31 --out reports\rehearsal_f3\forecast.parquet
-```
-
-`MacroConditioner` exposes separately ablatable mean, volatility, skew,
-shock, and common-factor adjustments. Its defaults are deliberately small and
-confidence-gated. Run the chronological local comparison with:
-
-```powershell
-python -m experiments.macro_ablation --track2-root "$Track2"
-```
-
-The method, held-out ablations, limitations, and public-unit gate checks are
-recorded in [conditioning backtest notes](docs/conditioning_backtest_notes.md).
-The current offline-proxy experiment does not support enabling text
-conditioning as the competition default.
-
-## Frozen submission candidate and rehearsal
-
-The current candidate is frozen in
-[`candidate.py`](src/off_the_tape/candidate.py): PCA joint paths, 1,000 draws,
-root seed 2026, and text conditioning disabled. The ordinary `forecast` command
-therefore makes no model call. Use `--text-conditioned` only for explicit
-research runs; `--numeric-only` remains accepted for clarity. The contract
-review and corrected discrepancies are in
-[`docs/contract_audit.md`](docs/contract_audit.md).
-
-Before serialization, the agent validates the complete asset/horizon grid,
-draw floor, contiguous IDs, dtypes, finite values, non-degenerate marginals,
-broad magnitude bounds, and positive FX levels. PCA failures use a deterministic
-joint empirical fallback with a volatility floor. Every stochastic production
-component derives from the CLI's root `--seed`.
-
-Run every public unit and generate `reports/submission_readiness.md` with:
-
-```powershell
-python scripts\smoke_all.py --track2-root "$Track2"
-```
-
-This records per-unit gates, runtime stages, fallbacks, calls, and token counts.
-On Windows it calls the Track 2 scorer's official g0–g3 functions directly,
-because the shared smoke wrapper requires POSIX no-follow directory flags.
-
-The submission [`Dockerfile`](Dockerfile) uses Python 3.13, exact runtime
-dependency pins, a non-root user, no runtime installation, and the required
-`qfbench2.interface_version="2.0"` label. The official scorer is installed
-only in [`Dockerfile.verifier`](Dockerfile.verifier), keeping it out of the
-submitted image. The public Git repository holds Parquet panels at each unit's
-root, while the evaluator mounts them under `panels/`. Stage the public units
-from committed Git bytes, which also preserves their manifest checksums on
-Windows, then run the network-isolated rehearsal:
-
-```powershell
-python scripts\stage_public_units.py --public-repo "$Track2" --out .cache\staged-public
-python scripts\rehearse_submission.py --track2-root .cache\staged-public --all
-```
-
-The rehearsal runs the agent and official `qfbench2-smoke` wrapper in separate
-Linux containers with `--network=none`. Use `--skip-build` only when both
-images already exist. Use a new staging directory for each run. The complete
-new-image result is in [the rehearsal record](docs/new_image_rehearsal.md).
-
-## Submission packaging
-
-The current [submission contract](https://github.com/Agenthon-2026/track2-forecasting-public/blob/main/SUBMISSION_CLI.md)
-requires an anonymously pullable `linux/amd64` image by immutable registry
-digest. Build, rehearse, and push the **runtime** image; the verifier image is
-local only. Confirm the registry package is public and test an anonymous pull.
-Build for the required architecture and push to your own public registry:
-
-```powershell
-docker buildx build --platform linux/amd64 --push -t ghcr.io/ORG/IMAGE:TAG .
-```
-
-Record the immutable registry digest from the push result. Then install the
-[submission toolkit](https://github.com/Agenthon-2026/Agenthon2026-public/blob/v2.4.4/starter-packs/track2/SUBMISSION-DESCRIPTOR.md)
-at version 2.4.4 on the host and run:
-
-```powershell
-python scripts\package_submission.py --image ghcr.io/ORG/IMAGE@sha256:DIGEST --team-number N --license YOUR_SPDX_LICENSE
-```
-
-On Windows when Python 3.13 is unavailable on `PATH`, build the local packager
-container instead and run the same script through it. The bind mount lets the
-toolkit write `submission.zip` into this repository:
-
-```powershell
-docker build --file Dockerfile.packager --build-arg RUNTIME_IMAGE=off-the-tape:candidate --tag off-the-tape:packager .
-docker run --rm -it --mount "type=bind,src=$((Get-Location).Path),dst=/workspace" off-the-tape:packager python scripts/package_submission.py --image ghcr.io/ORG/IMAGE@sha256:DIGEST --team-number N --license YOUR_SPDX_LICENSE
-```
-
-Use your actual image digest, team number, and code license. The script copies
-the official Track 2 descriptor fixture, declares the numeric-only candidate
-with `models: []`, and invokes the toolkit's `submission pack`. The toolkit
-prompts privately for the Team Key and writes `submission.zip` with only
-`submission.json` and `team-claim.json`. Neither file is tracked in Git.
-Packaging does not upload the zip or consume a submission attempt.
-The MIT-licensed runtime image was pushed to Docker Hub as
-`docker.io/anushm22/off-the-tape@sha256:99a9fe62fdf906b6627a1f8fcec0d5b42ddc627abec3edc26c63e4f4df7abc2e`
-on 2026-09-30. It is `linux/amd64`, 495,782,725 bytes (495.8 MB), and an
-unauthenticated manifest lookup succeeded. Use this exact digest for Team 404's
-Development submission. The local packager command is:
-
-```powershell
-docker run --rm -it --mount "type=bind,src=$((Get-Location).Path),dst=/workspace" off-the-tape:packager python scripts/package_submission.py --image docker.io/anushm22/off-the-tape@sha256:99a9fe62fdf906b6627a1f8fcec0d5b42ddc627abec3edc26c63e4f4df7abc2e --team-number 404 --license MIT
-```
-
-The prior combined image measured 755.5 MB.
-All 104 public units produced the required three files under `--network=none`
-and passed `qfbench2-smoke` in the verifier image. The earlier
-`reports/submission_readiness.md` describes the prior combined image.
-
-Run tests with `python -m pytest` after installing dependencies. The in-memory
-unit tests can also run with `python -m unittest discover -s tests`.
+Large input panels, detailed local reports, caches and team claims are excluded from Git. Compact audit summaries and findings are tracked. Licensed under [MIT](LICENSE). Public task definitions and scoring originated in the [Agenthon Track 2 repository](https://github.com/Agenthon-2026/track2-forecasting-public).
