@@ -28,6 +28,11 @@ The default command follows the numeric path and makes no LLM call. PCA fits eac
 
 ## Results
 
+See the [two frozen candidate profiles](docs/frozen_candidates.md) for an
+explicit comparison of assumptions, volatility rules and evidence. A separate
+[shared-input study](docs/controlled_architecture_protocol.md) controls the
+preprocessing differences; it does not redefine the original candidates.
+
 The numerical study uses chronological splits: **2005–2017 training (691 cases), 2018–2021 validation (226), and 2022–2024 holdout (156 across 33 origins)**. Each forecast has 1,000 draws and three seeds. The suite covers single yields, yield curves, single FX, FX baskets and mixed rates/FX at 2–12 weekday horizons. Seeds measure Monte Carlo sensitivity; they are not independent market samples.
 
 Loss combines marginal CRPS, joint variogram and tail pinball terms with locally reconstructed expected-error normalization. **Lower is better.**

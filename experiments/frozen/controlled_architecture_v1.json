@@ -1,0 +1,63 @@
+{
+  "settings": {
+    "split": "validation",
+    "lookback_changes": 504,
+    "draws": 1000,
+    "seeds": [
+      2026,
+      17,
+      83
+    ],
+    "drift": "full historical sample mean",
+    "volatility": "historical sample sd; no adaptive rescaling",
+    "panels": "independent rates and FX",
+    "fx": "log_price",
+    "rates": "difference",
+    "pca_factors": 2,
+    "pca_block": 5,
+    "bootstrap_reps": 10000,
+    "bootstrap_block": 4,
+    "bootstrap_seed": 901,
+    "timing_repeats": 3
+  },
+  "manifest_sha256": "72a9209c42e231ef6f468f89e32c50c5120fe1b4454d909398bcb37157a63215",
+  "code_sha256": {
+    "experiments/controlled_architecture.py": "995dae0e883302de08fcaa87530975ba90f9f3fec42177eb2b9aa6df29256196",
+    "experiments/final_cases.py": "29b3246c30c5f326c63ad2bf666ee83f6dd83d89ab4ee819360514e282afca29",
+    "experiments/gaussian_comparison.py": "76447a8ae20689694bd94a469bdda94a9f2c1622c367fd0bf9661b4b282bb091",
+    "src/off_the_tape/features.py": "5cef0f66b6909816e5a3bf792bb7554ea6bd2201d24f32db4d6886cedf45c175",
+    "src/off_the_tape/pca_joint.py": "ee84abd63c2704911c2a9ddc3f797ce79a5a43c28e6d65cda2e38c3182fc193e",
+    "src/off_the_tape/gaussian_joint.py": "53a4f9435bcad3195d791db37f66233fb462be427c5a776687bc57a6f053f41d",
+    "src/off_the_tape/historical.py": "571452f18caab91236e369e5f0097a4893d812e4c31e0920fa7e38592f13772e",
+    "src/off_the_tape/seeds.py": "8418e702265ee3866ef53d0712ac131266c8a75f58fe9f1dc2579946208b5a8f",
+    "tests/test_controlled_architecture.py": "ff8cebcf7a9ef478ff54eef82816f53ebfe613d3236794cfd36c4821255b64ea",
+    "docs/controlled_architecture_protocol.md": "272c81ffabd398496a8e09652ba49ac3b2de220b5407099f3e7e103b9fd42d73"
+  },
+  "environment": {
+    "python": "3.13.15",
+    "packages": {
+      "numpy": "2.1.3",
+      "pandas": "2.2.3",
+      "pyarrow": "18.1.0",
+      "scipy": "1.18.1",
+      "qfbench2-common": "2.3.1",
+      "qfbench2-track-forecasting": "3.1.0"
+    },
+    "threads": {
+      "OPENBLAS_NUM_THREADS": "1",
+      "OMP_NUM_THREADS": "1"
+    }
+  },
+  "sources": [
+    {
+      "path": ".cache/track2-public/units/t2-F1-hawkish-cut-2024/rates_daily.parquet",
+      "sha256": "e22ab4b961f4653d5c960e122b5c414c718f829e9e2e25e8121aec9c3cb29aac"
+    },
+    {
+      "path": ".cache/track2-public/units/t2-F3-election-2024-joint/g10_fx_daily.parquet",
+      "sha256": "c9c20e261baedc1fe7e1104017f0afefacdc0838170516ad43b43d9ef9b8b738"
+    }
+  ],
+  "exploratory": true,
+  "holdout_scored": false
+}
