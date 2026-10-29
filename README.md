@@ -1,5 +1,34 @@
 # Off The Tape: historical Track 2 evaluation
 
+## Research extensions on main
+
+The completed research extensions are consolidated here:
+
+- [Historical case construction](docs/final_historical_cases.md),
+  [PCA/Gaussian comparison](docs/gaussian_comparison.md), and controlled
+  [drift](docs/drift_ablation.md), [cross-panel dependence](docs/cross_panel_ablation.md),
+  and [volatility](docs/volatility_ablation.md) experiments.
+- [Frozen holdout protocol](docs/frozen_holdout_protocol.md) and
+  [results](docs/frozen_holdout_results.md): PCA's adaptive-volatility candidate
+  reduced local historical holdout loss by 3.88% against its own control and
+  passed the predeclared criterion. The holdout is now consumed.
+- [Exploratory direct candidate comparison](docs/direct_candidate_comparison.md):
+  Gaussian's mean loss was 2.02% lower than PCA's, but the paired interval
+  crossed zero. No overall model winner was established.
+- [Band-SETAR extension](docs/setar_ablation.md): the tested nonlinear factor
+  dynamics did not improve validation; retained as research, not enabled.
+- [Shared numeric feature layer](docs/shared_feature_layer.md): cutoff-aware
+  snapshots, alignment, transformations and volatility calculations are
+  implemented and connected to PCA. Recorded public-unit forecast/fallback
+  parity was 104/104 after the refactor.
+
+Research candidates and the published Docker image are distinct artifacts.
+The volatility candidate and SETAR experiment are not enabled in the production
+configuration. Historical freeze hashes remain unchanged: reproduce those
+experiments at their recorded commits, rather than rewriting their protocols
+to accept later refactors. These are local research findings, not official
+competition results.
+
 This repository currently provides a local historical evaluation harness. It creates
 pseudo-cards from a full historical panel, passes only observations through each
 as-of date to a forecasting callback, constructs later outcomes, and scores saved
