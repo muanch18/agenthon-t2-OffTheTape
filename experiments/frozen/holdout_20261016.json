@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "frozen_date": "2026-10-16",
+  "parent_commit": "8c0d78f",
+  "candidate_rules": {
+    "pca": "ewma20_blend",
+    "gaussian": "recent60"
+  },
+  "seeds": [
+    2026,
+    17,
+    83
+  ],
+  "draws_per_arm": 1000,
+  "primary_comparisons": [
+    "pca",
+    "gaussian"
+  ],
+  "decision_rule": "adjusted block interval upper bound below zero; no automatic production change",
+  "bootstrap": {
+    "block_length": 4,
+    "replicates": 10000,
+    "seed": 901,
+    "primary_quantiles": [
+      0.0125,
+      0.9875
+    ],
+    "diagnostic_quantiles": [
+      0.025,
+      0.975
+    ]
+  },
+  "manifest_path": "reports/final_cases.json",
+  "manifest_sha256": "72a9209c42e231ef6f468f89e32c50c5120fe1b4454d909398bcb37157a63215",
+  "holdout_cases": 156,
+  "holdout_origins": 33,
+  "code_sha256": {
+    "experiments/frozen_holdout.py": "fb7c5707660f4afc158808367d3b057692dd5b1f514596a15d72d85a27668f1e",
+    "experiments/final_cases.py": "29b3246c30c5f326c63ad2bf666ee83f6dd83d89ab4ee819360514e282afca29",
+    "experiments/volatility_ablation.py": "6b66a7217352f68ce1b7a49e9b1ecfe2c8dbeb2628d3154429ae5bc8bf116866",
+    "experiments/gaussian_comparison.py": "76447a8ae20689694bd94a469bdda94a9f2c1622c367fd0bf9661b4b282bb091",
+    "src/off_the_tape/gaussian_joint.py": "53a4f9435bcad3195d791db37f66233fb462be427c5a776687bc57a6f053f41d",
+    "src/off_the_tape/pca_joint.py": "3f256fd48d69209f21ade56ede2c960e2cfa7b1a9efb09427adcd95a1532180f",
+    "src/off_the_tape/seeds.py": "8418e702265ee3866ef53d0712ac131266c8a75f58fe9f1dc2579946208b5a8f",
+    "src/off_the_tape/historical.py": "571452f18caab91236e369e5f0097a4893d812e4c31e0920fa7e38592f13772e"
+  },
+  "python_version": "3.13.15",
+  "packages": {
+    "numpy": "2.1.3",
+    "pandas": "2.2.3",
+    "pyarrow": "18.1.0",
+    "scipy": "1.18.1",
+    "qfbench2-common": "2.3.1",
+    "qfbench2-track-forecasting": "3.1.0"
+  },
+  "code_hash_policy": "UTF-8 text with universal newlines normalized to LF"
+}
